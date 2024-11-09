@@ -70,7 +70,7 @@ func (app *application) listMovieHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	movies, err := app.models.Movies.List(context.Background(), input.Title, input.Genres, &input.Filters)
+	movies, count, err := app.models.Movies.List(context.Background(), input.Title, input.Genres, &input.Filters)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrorRecordNotFound):
@@ -81,7 +81,9 @@ func (app *application) listMovieHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = app.writeJson(w, http.StatusOK, envelope{"Movies": movies}, nil)
+	pMeta := input.Filters.PaginationMetaData(count)
+
+	err = app.writeJson(w, http.StatusOK, envelope{"Metadata": pMeta, "Movies": movies}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}

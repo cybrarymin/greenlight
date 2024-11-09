@@ -1,12 +1,24 @@
 package data
 
-import "strings"
+import (
+	"math"
+	"strings"
+)
 
 type Filters struct {
 	Page         int
 	PageSize     int
 	Sort         string
 	SortSafeList []string
+	PaginationMeta
+}
+
+type PaginationMeta struct {
+	FirstPage    int `json:"first_page,omitempty"`
+	LastPage     int `json:"last_page,omitempty"`
+	TotalRecords int `json:"total_records,omitempty"`
+	pageSize     int `json:"page_size,omitempty"`
+	CurrentPage  int `json:"current_page,omitempty"`
 }
 
 func (f *Filters) ValidateFilters(v *Validator) {
@@ -37,4 +49,13 @@ func (f Filters) limit() int {
 
 func (f Filters) offset() int {
 	return (f.Page - 1) * f.PageSize
+}
+
+func (f *Filters) PaginationMetaData(totalRecords int) PaginationMeta {
+	f.PaginationMeta.FirstPage = 1
+	f.PaginationMeta.CurrentPage = f.Page
+	f.PaginationMeta.LastPage = int(math.Ceil(float64(totalRecords) / float64(f.PageSize)))
+	f.PaginationMeta.TotalRecords = totalRecords
+	f.PaginationMeta.pageSize = f.pageSize
+	return f.PaginationMeta
 }
