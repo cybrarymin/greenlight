@@ -31,7 +31,7 @@ func (app *application) serverErrorResponse(w http.ResponseWriter, r *http.Reque
 
 // notFoundResponse method will be used to send notFound 404 status error json response to the client
 func (app *application) notFoundResponse(w http.ResponseWriter, r *http.Request) {
-	message := fmt.Sprintf("the requested resource couldn't be found")
+	message := fmt.Sprintln("the requested resource couldn't be found")
 	app.errorResponse(w, r, http.StatusNotFound, message)
 }
 
@@ -47,4 +47,9 @@ func (app *application) methodNotAllowedResponse(w http.ResponseWriter, r *http.
 
 func (app *application) failedValidationResponse(w http.ResponseWriter, r *http.Request, errors map[string]string) {
 	app.errorResponse(w, r, http.StatusUnprocessableEntity, errors)
+}
+
+func (app *application) editConflictResponse(w http.ResponseWriter, r *http.Request) {
+	message := "unable to update the record due to an edit conflict, please try again"
+	app.errorResponse(w, r, http.StatusConflict, message)
 }

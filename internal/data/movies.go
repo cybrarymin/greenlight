@@ -10,11 +10,13 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 )
 
 var (
 	ErrInvalidRuntimeFormat = errors.New("invalid runtime format")
 	ErrorRecordNotFound     = errors.New("record not found")
+	ErrEditConflict         = errors.New("edit conflict")
 )
 
 type Movie struct {
@@ -34,17 +36,24 @@ type MovieModel struct {
 
 func (m *MovieModel) Insert(ctx context.Context, movie *Movie) error {
 	args := []interface{}{&movie.ID, &movie.CreatedAt, &movie.Version}
-	err := m.db.NewInsert().Model(movie).Returning("id, created_at, version").Scan(ctx, args...)
+	// define the timeouts context exactly before the process that needs that context to make sure only that specific process uses the countdown
+	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*5)
+	defer cancelFunc()
+	err := m.db.NewInsert().Model(movie).Returning("id, created_at, version").Scan(timeoutCtx, args...)
 	if err != nil {
 		return err
 	}
 	return nil
 }
+
 func (m *MovieModel) Delete(ctx context.Context, id int64) error {
 	if id < 1 {
 		return ErrorRecordNotFound
 	}
-	result, err := m.db.NewDelete().Model((*Movie)(nil)).Where("id = ?", id).Exec(ctx)
+	// define the timeouts context exactly before the process that needs that context to make sure only that specific process uses the countdown
+	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*5)
+	defer cancelFunc()
+	result, err := m.db.NewDelete().Model((*Movie)(nil)).Where("id = ?", id).Exec(timeoutCtx)
 	if ok, _ := result.RowsAffected(); ok == 0 {
 		return ErrorRecordNotFound
 	}
@@ -53,20 +62,32 @@ func (m *MovieModel) Delete(ctx context.Context, id int64) error {
 	}
 	return nil
 }
+
 func (m *MovieModel) Update(ctx context.Context, id int64, movie *Movie) error {
 	args := []interface{}{&movie.CreatedAt, &movie.Version}
-	err := m.db.NewUpdate().Model(movie).Set("version = version + 1").Where("id = ?", id).Returning("created_at, version").Scan(ctx, args...)
+	movie.Version += 1
+	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*5)
+	defer cancelFunc()
+	err := m.db.NewUpdate().Model(movie).Where("id = ?", id).Where("version = ?", movie.Version).Returning("created_at, version").Scan(timeoutCtx, args...)
 	if err != nil {
-		return err
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
 	}
 	return nil
 }
+
 func (m *MovieModel) Select(ctx context.Context, id int64) (*Movie, error) {
 	nMovie := Movie{}
 	if id < 1 {
 		return nil, ErrorRecordNotFound
 	}
-	err := m.db.NewSelect().Model((*Movie)(nil)).Where("id = ?", id).Scan(ctx, &nMovie)
+	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*5)
+	defer cancelFunc()
+	err := m.db.NewSelect().Model((*Movie)(nil)).Where("id = ?", id).Scan(timeoutCtx, &nMovie)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -76,6 +97,25 @@ func (m *MovieModel) Select(ctx context.Context, id int64) (*Movie, error) {
 		}
 	}
 	return &nMovie, nil
+}
+
+func (m *MovieModel) List(ctx context.Context, title string, genres []string, filters *Filters) ([]Movie, error) {
+	nMovie := []Movie{}
+	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*5)
+	defer cancelFunc()
+
+	orderQuery := filters.SortColumn() + " " + filters.SortDirection()
+	err := m.db.NewSelect().Model((*Movie)(nil)).Where("(title_tsvector @@ to_tsquery('simple',?)) OR (? = '')", title, title).Where("(genres @> ? OR ? = '{}')", pgdialect.Array(genres), pgdialect.Array(genres)).OrderExpr(orderQuery).Limit(filters.limit()).Offset(filters.offset()).Scan(timeoutCtx, &nMovie)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrorRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+	return nMovie, nil
 }
 
 type Runtime int32

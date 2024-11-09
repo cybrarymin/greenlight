@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
+	"github.com/cybrarymin/greenlight/internal/data"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -22,6 +24,43 @@ func (app *application) readIDParam(r *http.Request) (int64, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+// readString function reads the query strings then extracts the the value of the specified key.
+// If the key doesn't exist it will return default value
+func (app *application) readString(qs url.Values, key string, defaultValue string) string {
+	if value := qs.Get(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// The readCSV() helper reads a string value from the query string and then splits it
+// into a slice on the comma character. If no matching key could be found, it returns
+// the provided default value.
+func (app *application) readCSV(qs url.Values, key string, defaultValue []string) []string {
+	csv := qs.Get(key)
+	if csv == "" {
+		return defaultValue
+	}
+	return strings.Split(csv, ",")
+}
+
+// The readInt() helper reads a string value from the query string and converts it to an
+// integer before returning. If no matching key could be found it returns the provided
+// default value. If the value couldn't be converted to an integer, then we record an
+// error message in the provided Validator instance.
+func (app *application) readInt(qs url.Values, key string, defaultValue int, v *data.Validator) int {
+	numString := qs.Get(key)
+	if numString == "" {
+		return defaultValue
+	}
+	num, err := strconv.Atoi(numString)
+	if err != nil {
+		v.AddError(key, "must be an integer type")
+		return defaultValue
+	}
+	return num
 }
 
 func (app *application) writeJson(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
