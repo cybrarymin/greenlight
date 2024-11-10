@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
+	"github.com/uptrace/bun/extra/bunzerolog"
 )
 
 const version = "1.0.0"
@@ -24,6 +26,8 @@ var (
 	DBMaxConnCount       int
 	DBMaxIdleConnCount   int
 	DBMaxIdleConnTimeout time.Duration
+	LogLevel             int8
+	DBLogs               bool
 )
 
 type config struct {
@@ -34,6 +38,7 @@ type config struct {
 		dbMaxConnCount       int
 		DBMaxIdleConnCount   int
 		DBMaxIdleConnTimeout time.Duration
+		DBLogs               bool
 	}
 }
 
@@ -44,7 +49,12 @@ type application struct {
 }
 
 func Api() {
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	var logger zerolog.Logger
+	if zerolog.Level(LogLevel).String() == zerolog.LevelTraceValue {
+		logger = zerolog.New(os.Stdout).With().Stack().Timestamp().Logger().Level(zerolog.Level(LogLevel))
+	} else {
+		logger = zerolog.New(os.Stdout).With().Timestamp().Logger().Level(zerolog.Level(LogLevel))
+	}
 
 	cfg := config{
 		port: ListenPort,
@@ -54,11 +64,13 @@ func Api() {
 			dbMaxConnCount       int
 			DBMaxIdleConnCount   int
 			DBMaxIdleConnTimeout time.Duration
+			DBLogs               bool
 		}{
 			DBDSN,
 			DBMaxConnCount,
 			DBMaxIdleConnCount,
 			DBMaxIdleConnTimeout,
+			DBLogs,
 		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -70,6 +82,16 @@ func Api() {
 	}
 	defer db.Close()
 
+	if cfg.db.DBLogs {
+		db.AddQueryHook(bunzerolog.NewQueryHook(
+			bunzerolog.WithLogger(&logger),
+			bunzerolog.WithQueryLogLevel(zerolog.DebugLevel),      // Show database interaction logs by debug tag
+			bunzerolog.WithSlowQueryLogLevel(zerolog.WarnLevel),   // Show database slow queries as warnings tag
+			bunzerolog.WithErrorQueryLogLevel(zerolog.ErrorLevel), // Show database slow queries as error tag
+			bunzerolog.WithSlowQueryThreshold(3*time.Second),
+		))
+	}
+
 	app := &application{
 		config: cfg,
 		log:    &logger,
@@ -80,6 +102,7 @@ func Api() {
 		Addr:         fmt.Sprintf(":%d", cfg.port),
 		Handler:      app.routes(),
 		IdleTimeout:  time.Minute,
+		ErrorLog:     log.New(logger, "", 0),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}

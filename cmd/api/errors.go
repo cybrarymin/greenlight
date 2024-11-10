@@ -6,7 +6,7 @@ import (
 )
 
 // logError is the method we use to log the errors happens on the server side for the application.
-func (app *application) logError(r *http.Request, err error) {
+func (app *application) logError(err error) {
 	app.log.Error().Err(err).Send()
 }
 
@@ -17,14 +17,14 @@ func (app *application) errorResponse(w http.ResponseWriter, r *http.Request, st
 	}
 	err := app.writeJson(w, status, e, nil)
 	if err != nil {
-		app.logError(r, err)
+		app.logError(err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
 // serverErrorResponse uses the two other methods to log the details of the error and send internal server error to the client
 func (app *application) serverErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
-	app.logError(r, err)
+	app.logError(err)
 	message := "the server encountered an error to process the request"
 	app.errorResponse(w, r, http.StatusInternalServerError, message)
 }

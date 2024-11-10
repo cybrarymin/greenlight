@@ -99,23 +99,30 @@ func (m *MovieModel) Select(ctx context.Context, id int64) (*Movie, error) {
 	return &nMovie, nil
 }
 
-func (m *MovieModel) List(ctx context.Context, title string, genres []string, filters *Filters) ([]Movie, error) {
-	nMovie := []Movie{}
+func (m *MovieModel) List(ctx context.Context, title string, genres []string, filters *Filters) ([]Movie, int, error) {
+	args := []struct {
+		Count int
+		Movie
+	}{}
+	nMovies := []Movie{}
+
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*5)
 	defer cancelFunc()
 
 	orderQuery := filters.SortColumn() + " " + filters.SortDirection()
-	err := m.db.NewSelect().Model((*Movie)(nil)).Where("(title_tsvector @@ to_tsquery('simple',?)) OR (? = '')", title, title).Where("(genres @> ? OR ? = '{}')", pgdialect.Array(genres), pgdialect.Array(genres)).OrderExpr(orderQuery).Limit(filters.limit()).Offset(filters.offset()).Scan(timeoutCtx, &nMovie)
-
+	err := m.db.NewSelect().Model((*Movie)(nil)).ColumnExpr("COUNT(*) OVER(),*").Where("(title_tsvector @@ to_tsquery('simple',?)) OR (? = '')", title, title).Where("(genres @> ? OR ? = '{}')", pgdialect.Array(genres), pgdialect.Array(genres)).OrderExpr(orderQuery).Limit(filters.limit()).Offset(filters.offset()).Scan(timeoutCtx, &args)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			return nil, ErrorRecordNotFound
+			return nil, 0, ErrorRecordNotFound
 		default:
-			return nil, err
+			return nil, 0, err
 		}
 	}
-	return nMovie, nil
+	for _, v := range args {
+		nMovies = append(nMovies, v.Movie)
+	}
+	return nMovies, args[0].Count, nil
 }
 
 type Runtime int32

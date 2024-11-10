@@ -50,9 +50,11 @@ func init() {
 	rootCmd.Flags().StringVar(&api.Env, "env", "development", "environment (development|staging|production)")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.PersistentFlags().StringVar(&api.DBDSN, "db-connection-string", "", "postgres database connection string")
+	rootCmd.MarkPersistentFlagRequired("db-connection-string")
 	rootCmd.Flags().IntVar(&api.DBMaxConnCount, "db-max-conn", 25, "maximum idle and active connection client can have to the database")
 	rootCmd.Flags().IntVar(&api.DBMaxIdleConnCount, "db-idle-max-conn", 25, "maximum idle connection client can have to the database")
 	rootCmd.Flags().DurationVar(&api.DBMaxIdleConnTimeout, "db-idle-conn-timeout", time.Minute*15, "maximum amount of time an idle connection will exist")
-	rootCmd.MarkPersistentFlagRequired("db-connection-string")
+	rootCmd.Flags().BoolVar(&api.DBLogs, "db-enable-log", false, "enable database interaction logs")
+	rootCmd.Flags().Int8Var(&api.LogLevel, "log-level", 1, "loglevel of the application - debug:0 info:1 warn:2 error:3 fatal:4 panic:5 trace:-1")
 
 }
