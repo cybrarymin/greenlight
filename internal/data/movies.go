@@ -11,7 +11,6 @@ import (
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
-	"github.com/uptrace/bun/extra/bundebug"
 )
 
 var (
@@ -109,7 +108,7 @@ func (m *MovieModel) List(ctx context.Context, title string, genres []string, fi
 
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*5)
 	defer cancelFunc()
-	m.db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(true))) //TSHOOT
+
 	orderQuery := filters.SortColumn() + " " + filters.SortDirection()
 	err := m.db.NewSelect().Model((*Movie)(nil)).ColumnExpr("COUNT(*) OVER(),*").Where("(title_tsvector @@ to_tsquery('simple',?)) OR (? = '')", title, title).Where("(genres @> ? OR ? = '{}')", pgdialect.Array(genres), pgdialect.Array(genres)).OrderExpr(orderQuery).Limit(filters.limit()).Offset(filters.offset()).Scan(timeoutCtx, &args)
 	if err != nil {
