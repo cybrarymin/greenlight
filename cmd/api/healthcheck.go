@@ -10,7 +10,6 @@ func (app *application) healthcheckHandler(w http.ResponseWriter, r *http.Reques
 		"environment": Env,
 		"version":     version,
 	}
-
 	err := app.writeJson(w, http.StatusOK, envelope{
 		"health": data,
 	}, nil)

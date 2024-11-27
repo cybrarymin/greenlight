@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/cybrarymin/greenlight/internal/data"
+	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -24,6 +25,16 @@ func (app *application) readIDParam(r *http.Request) (int64, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+func (app *application) readUUIDParam(r *http.Request) (uuid.UUID, error) {
+	params := httprouter.ParamsFromContext(r.Context())
+	uuidParam := params.ByName("id")
+	cuuid, err := uuid.Parse(uuidParam)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return cuuid, nil
 }
 
 // readString function reads the query strings then extracts the the value of the specified key.

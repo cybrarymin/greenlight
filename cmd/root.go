@@ -56,5 +56,12 @@ func init() {
 	rootCmd.Flags().DurationVar(&api.DBMaxIdleConnTimeout, "db-idle-conn-timeout", time.Minute*15, "maximum amount of time an idle connection will exist")
 	rootCmd.Flags().BoolVar(&api.DBLogs, "db-enable-log", false, "enable database interaction logs")
 	rootCmd.Flags().Int8Var(&api.LogLevel, "log-level", 1, "loglevel of the application - debug:0 info:1 warn:2 error:3 fatal:4 panic:5 trace:-1")
-
+	rootCmd.Flags().Int64Var(&api.GlobalRateLimit, "global-request-rate-limit", 100, "used to apply rate limiting to total number of requests coming to the api server. 10% of the specified value will be considered as the burst limit for total number of requests")
+	rootCmd.Flags().Int64Var(&api.PerClientRateLimit, "per-client-rate-limit", 100, "used to apply rate limiting to per client number of requests coming to the api server. 10% of the specified value will be considered as the burst limit for total number of requests")
+	rootCmd.Flags().BoolVar(&api.EnableRateLimit, "enable-rate-limit", false, "enable rate limiting")
+	rootCmd.Flags().StringVar(&api.SMTPServer, "smtp-server-addr", "smptserver.test.com", "smtp server to send the email for user after registration")
+	rootCmd.Flags().IntVar(&api.SMTPPort, "smtp-server-port", 2525, "smtp server port that you want your emails to")
+	rootCmd.Flags().StringVar(&api.SMTPUserName, "smtp-username", "", "smtp-username")
+	rootCmd.Flags().StringVar(&api.SMTPPassword, "smtp-password", "", "smtp-pass")
+	rootCmd.Flags().StringVar(&api.EmailSender, "smtp-sender-address")
 }

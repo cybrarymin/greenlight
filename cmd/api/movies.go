@@ -163,6 +163,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	err = app.readJson(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
+		return
 	}
 
 	if input.Title != nil {

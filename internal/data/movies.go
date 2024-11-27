@@ -68,7 +68,7 @@ func (m *MovieModel) Update(ctx context.Context, id int64, movie *Movie) error {
 	movie.Version += 1
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*5)
 	defer cancelFunc()
-	err := m.db.NewUpdate().Model(movie).Where("id = ?", id).Where("version = ?", movie.Version).Returning("created_at, version").Scan(timeoutCtx, args...)
+	err := m.db.NewUpdate().Model(movie).Where("id = ?", id).Where("version = ?", movie.Version-1).Returning("created_at, version").Scan(timeoutCtx, args...)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
