@@ -63,5 +63,5 @@ func init() {
 	rootCmd.Flags().IntVar(&api.SMTPPort, "smtp-server-port", 2525, "smtp server port that you want your emails to")
 	rootCmd.Flags().StringVar(&api.SMTPUserName, "smtp-username", "", "smtp-username")
 	rootCmd.Flags().StringVar(&api.SMTPPassword, "smtp-password", "", "smtp-pass")
-	rootCmd.Flags().StringVar(&api.EmailSender, "smtp-sender-address")
+	rootCmd.Flags().StringVar(&api.EmailSender, "smtp-sender-address", "no-reply@greenlight.com", "sender email information to be represented to the email receiver")
 }

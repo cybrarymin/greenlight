@@ -24,5 +24,8 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/users", app.ListUserHandler)
 	router.HandlerFunc(http.MethodDelete, "/v1/users/:id", app.DeleteUserHandler)
+
+	// token activation Handlers
+	router.HandlerFunc(http.MethodPut, "/v1/users/:id/activate", app.userActivationHandler)
 	return app.PanicRecovery(app.RateLimit(router))
 }

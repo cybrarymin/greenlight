@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -38,9 +39,10 @@ type User struct {
 	Name          string    `json:"name" bun:",notnull"`
 	Password      Password  `json:"-" bun:"password_hash,type:bytea,notnull"`
 	CreatedAt     time.Time `json:"created_at,omitempty" bun:",type:timestamptz,notnull,default:current_timestamp()"`
-	Activated     bool      `json:"activated,omitempty" bun:",notnull,type:bool"`
+	Activated     bool      `json:"activated" bun:",notnull,type:bool"`
 	Email         string    `json:"email" bun:",type:ictext,unique"`
 	Version       int       `json:"-" bun:",notnull,default:1"`
+	Token         []*Token  `json:"-" bun:",rel:has-many,join:id=user_id"`
 }
 
 type Password struct {
@@ -182,6 +184,24 @@ func (u *UserModel) Delete(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	return nil
+}
+
+func (u *UserModel) GetUserByToken(ctx context.Context, tokenPlaintext string, tokenScope string) (*User, error) {
+	nUser := &User{}
+	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*3)
+	defer cancelFunc()
+	hash := sha256.Sum256([]byte(tokenPlaintext))
+
+	err := u.db.NewSelect().Model(nUser).Relation("Token").Where("hash = ? and scope = ?", hash[:], tokenScope).Scan(timeoutCtx)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrorRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+	return nUser, nil
 }
 
 func ValidateEmail(v *Validator, email string) {

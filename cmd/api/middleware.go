@@ -88,3 +88,21 @@ func (app *application) RateLimit(next http.Handler) http.Handler {
 		})
 	}
 }
+
+// func (app *application) BasicAuth(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		ctx := context.Background()
+// 		username, pass, ok := r.BasicAuth()
+// 		if !ok {
+// 			app.invalidAuthenticationCredResponse(w, r)
+// 			return
+// 		}
+// 		nUser, err := app.models.Users.GetByEmail(username, ctx)
+// 		if err != nil {
+// 			app.notFoundResponse(w, r)
+// 			return
+// 		}
+// 		nUser.Password
+
+// 	})
+// }

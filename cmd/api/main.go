@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/cybrarymin/greenlight/internal/data"
 	mailer "github.com/cybrarymin/greenlight/internal/mailter"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/pkgerrors"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
@@ -70,10 +72,12 @@ type application struct {
 	log    *zerolog.Logger
 	models *data.Models
 	mailer *mailer.Mailer
+	wg     sync.WaitGroup
 }
 
 func Api() {
 	var logger zerolog.Logger
+	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 	if zerolog.Level(LogLevel).String() == zerolog.LevelTraceValue {
 		logger = zerolog.New(os.Stdout).With().Stack().Timestamp().Logger().Level(zerolog.Level(LogLevel))
 	} else {
@@ -143,6 +147,7 @@ func Api() {
 		log:    &logger,
 		models: data.NewModels(db),
 		mailer: mailer.New(cfg.smtp.SMTPServer, cfg.smtp.SMTPPort, cfg.smtp.SMTPUserName, cfg.smtp.SMTPPassword, "greenlight <no-reply@greenlight.net>"), // TODO: Flags should be provided for the input arguments
+		wg:     sync.WaitGroup{},
 	}
 
 	srv := &http.Server{
@@ -189,6 +194,7 @@ func (app *application) gracefulShutdown(srv *http.Server, shutdownErr chan erro
 	// This will listen to signals specified and will relay to them to the channel specified.
 	// This will impede program to exit by the signal
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
 	s := <-quit
 	// Log that the signal has been catched.
 	app.log.Info().Msgf("catched signal %s", s.String())
@@ -196,9 +202,15 @@ func (app *application) gracefulShutdown(srv *http.Server, shutdownErr chan erro
 	// Shutdown method is waiting for all the requests to be processed and gracefully shuts down the http server without interrupting any active connection.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
-	shutdownErr <- srv.Shutdown(ctx) // Shutdown here will block unitl it shutdown everything. we use channel to read in the main function
+	err := srv.Shutdown(ctx) // Shutdown here will block unitl it shutdown everything. we use channel to read in the main function
+	if err != nil {
+		shutdownErr <- err
+	}
 
 	// Exit the application with success status code
+	app.log.Info().Msg("waiting for background tasks to finish")
+	app.wg.Wait()
+	shutdownErr <- nil
+
 	app.log.Info().Msg("stopped server")
-	os.Exit(0)
 }

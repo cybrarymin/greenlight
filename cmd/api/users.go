@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cybrarymin/greenlight/internal/data"
 )
@@ -13,9 +14,9 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	nVal := data.NewValidator()
 
 	var nInput struct {
-		Name     string `json:name`
-		Password string `json:password`
-		Email    string `json:email`
+		Name     string `json:"name"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
 	err := app.readJson(w, r, &nInput)
@@ -61,15 +62,37 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	err = app.mailer.Send(nUser.Email, "user_welcome.tpl", nUser)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
+	app.BackgroundJob(func() {
+
+		ctx := context.Background()
+		nToken, err := app.models.Tokens.New(ctx, nUser.ID)
+		if err != nil {
+			app.log.Error().Err(err).Msg(fmt.Sprintf("token creation procedure failed for user %v", nUser.Email))
+			return
+		}
+
+		mailData := struct {
+			ID   string
+			Code string
+		}{
+			ID:   nUser.ID.String(),
+			Code: nToken.PlainText,
+		}
+		// retrying email sending if it failed
+		for i := 0; i < 3; i++ {
+			err = app.mailer.Send(nUser.Email, "user_welcome.tpl", mailData)
+			if err == nil {
+				return
+			} else {
+				app.log.Error().Err(err).Msg(fmt.Sprintf("failed to send email to user %v", nUser.Email))
+				time.Sleep(500 * time.Millisecond)
+			}
+		}
+	}, "panic happened during sending email to user for activation")
 
 	headers := make(http.Header)
 	headers.Set("Location", fmt.Sprintf("/v1/users/%d", nUser.ID))
-	err = app.writeJson(w, http.StatusCreated, envelope{"result": nUser}, headers)
+	err = app.writeJson(w, http.StatusAccepted, envelope{"result": nUser}, headers)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return

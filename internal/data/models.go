@@ -5,6 +5,7 @@ import "github.com/uptrace/bun"
 type Models struct {
 	Movies MovieModel
 	Users  UserModel
+	Tokens TokenModel
 }
 
 func NewModels(db *bun.DB) *Models {
@@ -13,6 +14,9 @@ func NewModels(db *bun.DB) *Models {
 			db,
 		},
 		Users: UserModel{
+			db,
+		},
+		Tokens: TokenModel{
 			db,
 		},
 	}

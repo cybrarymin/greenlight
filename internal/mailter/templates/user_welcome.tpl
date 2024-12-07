@@ -6,8 +6,10 @@ Welcome to Greenlight!
 Hi,
 
 Thanks for signing up for a Greenlight account. We're excited to have you on board!
-For future reference, your user ID number is {{.ID}}.
+To activate your account pls use the below activation code on greenlight.com/v1/users/{{.ID}}/activated
 Thanks,
+
+Activation Code: {{.Code}}
 
 The Greenlight Team
 {{end}}
@@ -24,8 +26,10 @@ The Greenlight Team
 <body>
   <p>Hi,</p>
   <p>Thanks for signing up for a Greenlight account. We're excited to have you on board!</p>
-  <p>For future reference, your user ID number is {{.ID}}.</p>
+  <p>To activate your account pls use the below activation code on greenlight.com/v1/users/{{.ID}}/activated</p>
   <p>Thanks,</p>
+  <p>Activation Code: {{.Code}}</p>
+  
   <p>The Greenlight Team</p>
 </body>
 </html>

@@ -58,3 +58,13 @@ func (app *application) rateLimitExceedResponse(w http.ResponseWriter, r *http.R
 	message := "request rate limit reached, please try again later"
 	app.errorResponse(w, r, http.StatusTooManyRequests, message)
 }
+
+func (app *application) invalidActivationTokenResponse(w http.ResponseWriter, r *http.Request) {
+	message := "invalid or expired activation token"
+	app.errorResponse(w, r, http.StatusTooManyRequests, message)
+}
+
+func (app *application) invalidAuthenticationCredResponse(w http.ResponseWriter, r *http.Request) {
+	message := "invalid authentication creds or token"
+	app.errorResponse(w, r, http.StatusUnauthorized, message)
+}

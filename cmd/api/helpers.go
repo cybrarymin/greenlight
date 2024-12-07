@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,12 +10,29 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/cybrarymin/greenlight/internal/data"
 	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 )
 
 type envelope map[string]interface{}
+
+// Background function will send a function to the background using
+func (app *application) BackgroundJob(nfunc func(), PanicErrMsg string) {
+	app.wg.Add(1)
+	go func() {
+		defer app.wg.Done()
+		defer func() {
+			if panicErr := recover(); panicErr != nil {
+				pErr := errors.New(fmt.Sprintln(panicErr))
+				app.log.Error().Stack().Err(pErr).Msg(PanicErrMsg)
+			}
+		}()
+		nfunc()
+	}()
+}
 
 func (app *application) readIDParam(r *http.Request) (int64, error) {
 	params := httprouter.ParamsFromContext(r.Context())
