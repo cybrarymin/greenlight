@@ -1,13 +1,17 @@
 package api
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/cybrarymin/greenlight/internal/data"
 	"golang.org/x/time/rate"
 )
 
@@ -89,20 +93,50 @@ func (app *application) RateLimit(next http.Handler) http.Handler {
 	}
 }
 
-// func (app *application) BasicAuth(next http.Handler) http.Handler {
-// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		ctx := context.Background()
-// 		username, pass, ok := r.BasicAuth()
-// 		if !ok {
-// 			app.invalidAuthenticationCredResponse(w, r)
-// 			return
-// 		}
-// 		nUser, err := app.models.Users.GetByEmail(username, ctx)
-// 		if err != nil {
-// 			app.notFoundResponse(w, r)
-// 			return
-// 		}
-// 		nUser.Password
+func (app *application) BearerAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.Background()
+		headerValue := r.Header.Get("Authorization")
+		if headerValue == "" {
+			app.authenticationRequiredResposne(w, r)
+			return
+		}
+		headerValues := strings.Split(headerValue, " ")
 
-// 	})
-// }
+		if len(headerValues) != 2 || headerValues[0] != "Bearer" {
+			app.invalidAuthenticationCredResponse(w, r)
+			return
+		}
+		userToken := headerValues[1]
+
+		nValidator := data.NewValidator()
+		data.ValidateTokenPlaintext(nValidator, userToken)
+		if !nValidator.Valid() {
+			app.invalidActivationTokenResponse(w, r)
+			return
+		}
+
+		user, err := app.models.Users.GetUserByToken(ctx, userToken, data.AuthenticationScope)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrorRecordNotFound):
+				app.invalidAuthenticationCredResponse(w, r)
+				return
+			default:
+				app.serverErrorResponse(w, r, err)
+				return
+			}
+		}
+		matchedToken, ok := data.Tokens(user.Token).Match(userToken)
+		if !ok {
+			app.invalidAuthenticationCredResponse(w, r)
+			return
+		}
+		if time.Now().After(matchedToken.Expiry) {
+			app.invalidAuthenticationCredResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}

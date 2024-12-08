@@ -65,7 +65,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	app.BackgroundJob(func() {
 
 		ctx := context.Background()
-		nToken, err := app.models.Tokens.New(ctx, nUser.ID)
+		nToken, err := app.models.Tokens.New(ctx, time.Hour*72, nUser.ID, data.ActivationScope)
 		if err != nil {
 			app.log.Error().Err(err).Msg(fmt.Sprintf("token creation procedure failed for user %v", nUser.Email))
 			return

@@ -31,7 +31,7 @@ func (app *application) serverErrorResponse(w http.ResponseWriter, r *http.Reque
 
 // notFoundResponse method will be used to send notFound 404 status error json response to the client
 func (app *application) notFoundResponse(w http.ResponseWriter, r *http.Request) {
-	message := fmt.Sprintln("the requested resource couldn't be found")
+	message := "the requested resource couldn't be found"
 	app.errorResponse(w, r, http.StatusNotFound, message)
 }
 
@@ -65,6 +65,13 @@ func (app *application) invalidActivationTokenResponse(w http.ResponseWriter, r 
 }
 
 func (app *application) invalidAuthenticationCredResponse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("WWW-Authenticate", "Bearer")
 	message := "invalid authentication creds or token"
+	app.errorResponse(w, r, http.StatusUnauthorized, message)
+}
+
+func (app *application) authenticationRequiredResposne(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("WWW-Authenticate", "Bearer")
+	message := "unauthorized access"
 	app.errorResponse(w, r, http.StatusUnauthorized, message)
 }

@@ -32,8 +32,8 @@ func TestSet(t *testing.T) {
 				assert.Error(t, err, "expected error got none")
 			} else {
 				assert.NoError(t, err, "expected error to be nil but got one")
-				assert.LessOrEqual(t, len(*nPass.plaintext), 72, "expected the length be lesser than 72")
-				assert.NotEqual(t, len(nPass.hash), 0, "expected caculated hash but got nothing")
+				assert.LessOrEqual(t, len(*nPass.Plaintext), 72, "expected the length be lesser than 72")
+				assert.NotEqual(t, len(nPass.Hash), 0, "expected caculated hash but got nothing")
 			}
 		})
 	}
@@ -63,8 +63,8 @@ func TestMatch(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			nPass := Password{}
-			nPass.plaintext = &tc.password
-			nPass.hash = []byte(tc.hashValue)
+			nPass.Plaintext = &tc.password
+			nPass.Hash = []byte(tc.hashValue)
 			ok, err := nPass.Match()
 			if tc.expectedErr {
 				assert.False(t, ok, "expected the hash value to be wrong")

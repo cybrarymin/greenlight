@@ -46,16 +46,16 @@ type User struct {
 }
 
 type Password struct {
-	plaintext *string
-	hash      []byte
+	Plaintext *string
+	Hash      []byte
 }
 
 func (p *Password) Value() (driver.Value, error) {
-	return p.hash, nil
+	return p.Hash, nil
 }
 func (p *Password) Scan(src interface{}) error {
-	p.plaintext = nil
-	p.hash = src.([]byte)
+	p.Plaintext = nil
+	p.Hash = src.([]byte)
 	return nil
 }
 
@@ -70,13 +70,13 @@ func (p *Password) Set(passString string) error {
 			return err
 		}
 	}
-	p.plaintext = &passString
-	p.hash = bcryptPass
+	p.Plaintext = &passString
+	p.Hash = bcryptPass
 	return nil
 }
 
 func (p *Password) Match() (bool, error) {
-	err := bcrypt.CompareHashAndPassword(p.hash, []byte(*p.plaintext))
+	err := bcrypt.CompareHashAndPassword(p.Hash, []byte(*p.Plaintext))
 	if err != nil {
 		switch {
 		case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
@@ -124,10 +124,10 @@ func (u *UserModel) Update(id uuid.UUID, ctx context.Context, user *User) error 
 }
 
 func (u *UserModel) GetByEmail(email string, ctx context.Context) (*User, error) {
-	nUser := User{}
+	nUser := &User{}
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*5)
 	defer cancelFunc()
-	err := u.db.NewSelect().Model((*User)(nil)).Where("email = ?", email).Scan(timeoutCtx, nUser)
+	err := u.db.NewSelect().Model(nUser).Where("email = ?", email).Scan(timeoutCtx)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -136,7 +136,7 @@ func (u *UserModel) GetByEmail(email string, ctx context.Context) (*User, error)
 			return nil, err
 		}
 	}
-	return &nUser, nil
+	return nUser, nil
 }
 
 func (u *UserModel) GetByID(id uuid.UUID, ctx context.Context, user *User) error {
@@ -190,9 +190,12 @@ func (u *UserModel) GetUserByToken(ctx context.Context, tokenPlaintext string, t
 	nUser := &User{}
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*3)
 	defer cancelFunc()
-	hash := sha256.Sum256([]byte(tokenPlaintext))
 
-	err := u.db.NewSelect().Model(nUser).Relation("Token").Where("hash = ? and scope = ?", hash[:], tokenScope).Scan(timeoutCtx)
+	hash := sha256.Sum256([]byte(tokenPlaintext))
+	err := u.db.NewSelect().Model(nUser).Relation("Token", func(sq *bun.SelectQuery) *bun.SelectQuery {
+		return sq.Where("token.scope = ? AND token.hash = ?", tokenScope, hash)
+	}).Where("activated = true").Scan(timeoutCtx)
+
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -220,15 +223,15 @@ func ValidateUser(v *Validator, user *User) {
 	ValidateEmail(v, user.Email)
 	// If the plaintext password is not nil, call the standalone
 	// ValidatePasswordPlaintext() helper.
-	if user.Password.plaintext != nil {
-		ValidatePasswordPlaintext(v, *user.Password.plaintext)
+	if user.Password.Plaintext != nil {
+		ValidatePasswordPlaintext(v, *user.Password.Plaintext)
 	}
 	// If the password hash is ever nil, this will be due to a logic error in our
 	// codebase (probably because we forgot to set a password for the user). It's a
 	// useful sanity check to include here, but it's not a problem with the data
 	// provided by the client. So rather than adding an error to the validation map we
 	// raise a panic instead.
-	if user.Password.hash == nil {
+	if user.Password.Hash == nil {
 		panic("missing password hash for user")
 	}
 }

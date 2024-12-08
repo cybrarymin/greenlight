@@ -15,23 +15,24 @@ import (
 )
 
 const (
-	ActivationScope = "activation"
+	ActivationScope     = "activation"
+	AuthenticationScope = "BearerAuthentication"
 )
 
 type TokenModel struct {
 	db *bun.DB
 }
 
-type Tokens []Token
+type Tokens []*Token
 
 type Token struct {
 	bun.BaseModel `bun:"table:tokens"`
-	PlainText     string    `bun:"-"` // ignoring this field
-	Hash          []byte    `bun:",pk,notnull,type:bytea"`
-	UserID        uuid.UUID `bun:",type:uuid,notnull"`
-	User          *User     `bun:"rel:belongs-to,join:user_id=id"`
-	Expiry        time.Time `bun:",notnull,type:timestamptz"`
-	Scope         string    `bun:",type:text,notnull"`
+	PlainText     string    `json:"token" bun:"-"` // ignoring this field
+	Hash          []byte    `json:"-" bun:",pk,notnull,type:bytea"`
+	UserID        uuid.UUID `json:"-"`
+	User          *User     `json:"-" bun:"rel:belongs-to,join:user_id=id"`
+	Expiry        time.Time `json:"expiry" bun:",notnull,type:timestamptz"`
+	Scope         string    `json:"scope" bun:",type:text,notnull"`
 }
 
 func generateToken(userID uuid.UUID, ttl time.Duration, scope string) (*Token, error) {
@@ -56,22 +57,22 @@ func generateToken(userID uuid.UUID, ttl time.Duration, scope string) (*Token, e
 	return nToken, nil
 }
 
-func (t *Tokens) Match(token string) (*Token, bool) {
+func (t Tokens) Match(token string) (*Token, bool) {
 	hash := sha256.Sum256([]byte(token))
-	for _, v := range *t {
+	for _, v := range t {
 		if bytes.Equal(v.Hash, hash[:]) {
-			return &v, true
+			return v, true
 		}
 	}
 	return nil, false
 }
 
-func (tm TokenModel) New(ctx context.Context, userID uuid.UUID) (*Token, error) {
-	nToken, err := generateToken(userID, time.Hour*72, ActivationScope)
+func (tm TokenModel) New(ctx context.Context, ttl time.Duration, userID uuid.UUID, tokenScope string) (*Token, error) {
+	nToken, err := generateToken(userID, ttl, tokenScope)
 	if err != nil {
 		return nil, err
 	}
-	err = tm.InsertToken(context.Background(), nToken)
+	err = tm.InsertToken(ctx, nToken)
 	if err != nil {
 		return nil, err
 	}
