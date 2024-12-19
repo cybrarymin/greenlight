@@ -49,7 +49,8 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	err = app.models.Users.Insert(context.Background(), &nUser)
+	ctx := context.Background()
+	err = app.models.Users.Insert(ctx, &nUser)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrorDuplicateEmail):
@@ -60,6 +61,12 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 			app.serverErrorResponse(w, r, err)
 			return
 		}
+	}
+
+	err = app.models.Permissions.AddPermForUser(ctx, nUser.ID, "movies:read")
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
 	}
 
 	app.BackgroundJob(func() {

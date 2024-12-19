@@ -16,6 +16,7 @@ func (app *application) errorResponse(w http.ResponseWriter, r *http.Request, st
 		"error": message,
 	}
 	err := app.writeJson(w, status, e, nil)
+
 	if err != nil {
 		app.logError(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -72,6 +73,21 @@ func (app *application) invalidAuthenticationCredResponse(w http.ResponseWriter,
 
 func (app *application) authenticationRequiredResposne(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("WWW-Authenticate", "Bearer")
+	message := "authentication required"
+	app.errorResponse(w, r, http.StatusUnauthorized, message)
+}
+
+func (app *application) unauthorizedAccessResponse(w http.ResponseWriter, r *http.Request) {
 	message := "unauthorized access"
 	app.errorResponse(w, r, http.StatusUnauthorized, message)
+
+}
+func (app *application) unauthorizedAccessInactiveUserResponse(w http.ResponseWriter, r *http.Request) {
+	message := "user must be activated to access this resource"
+	app.errorResponse(w, r, http.StatusForbidden, message)
+}
+
+func (app *application) notPermittedResponse(w http.ResponseWriter, r *http.Request) {
+	message := "your user account doesn't have the necessary permissions to access this resource"
+	app.errorResponse(w, r, http.StatusForbidden, message)
 }

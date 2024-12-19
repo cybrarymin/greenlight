@@ -159,6 +159,8 @@ func Api() {
 		WriteTimeout: 30 * time.Second,
 	}
 
+	promInit(db)
+
 	shutdownErr := make(chan error)
 	go app.gracefulShutdown(srv, shutdownErr)
 

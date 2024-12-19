@@ -20,6 +20,7 @@ var (
 	ErrorDuplicateEmail               = errors.New("error user with same email already exist")
 	_                    sql.Scanner  = (*Password)(nil)
 	_                    driver.Value = (*Password)(nil)
+	AnonymousUser                     = &User{}
 )
 
 type UserModel struct {
@@ -35,14 +36,19 @@ type Users []User
 // custom password type defined below.
 type User struct {
 	bun.BaseModel `bun:"table:users"`
-	ID            uuid.UUID `json:"id" bun:",pk,notnull,type:uuid,default:gen_random_uuid()"`
-	Name          string    `json:"name" bun:",notnull"`
-	Password      Password  `json:"-" bun:"password_hash,type:bytea,notnull"`
-	CreatedAt     time.Time `json:"created_at,omitempty" bun:",type:timestamptz,notnull,default:current_timestamp()"`
-	Activated     bool      `json:"activated" bun:",notnull,type:bool"`
-	Email         string    `json:"email" bun:",type:ictext,unique"`
-	Version       int       `json:"-" bun:",notnull,default:1"`
-	Token         []*Token  `json:"-" bun:",rel:has-many,join:id=user_id"`
+	ID            uuid.UUID    `json:"id" bun:",pk,notnull,type:uuid,default:gen_random_uuid()"`
+	Name          string       `json:"name" bun:",notnull"`
+	Password      Password     `json:"-" bun:"password_hash,type:bytea,notnull"`
+	CreatedAt     time.Time    `json:"created_at,omitempty" bun:",type:timestamptz,notnull,default:current_timestamp()"`
+	Activated     bool         `json:"activated" bun:",notnull,type:bool"`
+	Email         string       `json:"email" bun:",type:ictext,unique"`
+	Version       int          `json:"-" bun:",notnull,default:1"`
+	Token         []*Token     `json:"-" bun:",rel:has-many,join:id=user_id"`
+	Permission    []Permission `json:"-" bun:",m2m:user_permissions,join:User=Permission"`
+}
+
+func (u *User) IsAnonymous() bool {
+	return u == AnonymousUser
 }
 
 type Password struct {
@@ -187,14 +193,12 @@ func (u *UserModel) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (u *UserModel) GetUserByToken(ctx context.Context, tokenPlaintext string, tokenScope string) (*User, error) {
-	nUser := &User{}
+	nToken := &Token{}
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*3)
 	defer cancelFunc()
 
 	hash := sha256.Sum256([]byte(tokenPlaintext))
-	err := u.db.NewSelect().Model(nUser).Relation("Token", func(sq *bun.SelectQuery) *bun.SelectQuery {
-		return sq.Where("token.scope = ? AND token.hash = ?", tokenScope, hash)
-	}).Where("activated = true").Scan(timeoutCtx)
+	err := u.db.NewSelect().Model(nToken).Relation("User").Where("hash = ?", hash).Scan(timeoutCtx)
 
 	if err != nil {
 		switch {
@@ -204,7 +208,7 @@ func (u *UserModel) GetUserByToken(ctx context.Context, tokenPlaintext string, t
 			return nil, err
 		}
 	}
-	return nUser, nil
+	return nToken.User, nil
 }
 
 func ValidateEmail(v *Validator, email string) {

@@ -7,11 +7,14 @@ import (
 	"net"
 	"net/http"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cybrarymin/greenlight/internal/data"
+	"github.com/felixge/httpsnoop"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/time/rate"
 )
 
@@ -93,14 +96,17 @@ func (app *application) RateLimit(next http.Handler) http.Handler {
 	}
 }
 
-func (app *application) BearerAuth(next http.HandlerFunc) http.HandlerFunc {
+func (app *application) Auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.Background()
 		headerValue := r.Header.Get("Authorization")
+
 		if headerValue == "" {
-			app.authenticationRequiredResposne(w, r)
+			r = app.SetUserContext(r, data.AnonymousUser)
+			next.ServeHTTP(w, r)
 			return
 		}
+
 		headerValues := strings.Split(headerValue, " ")
 
 		if len(headerValues) != 2 || headerValues[0] != "Bearer" {
@@ -127,16 +133,75 @@ func (app *application) BearerAuth(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 		}
-		matchedToken, ok := data.Tokens(user.Token).Match(userToken)
-		if !ok {
-			app.invalidAuthenticationCredResponse(w, r)
+		r = app.SetUserContext(r, user)
+
+		next.ServeHTTP(w, r)
+	}
+}
+func (app *application) requiredNonAnonymousUser(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		nUser := app.GetUserContext(r)
+		if nUser.IsAnonymous() {
+			app.authenticationRequiredResposne(w, r)
 			return
 		}
-		if time.Now().After(matchedToken.Expiry) {
-			app.invalidAuthenticationCredResponse(w, r)
+		next.ServeHTTP(w, r)
+	}
+}
+
+func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+	// defining fn as a function
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		nUser := app.GetUserContext(r)
+		if !nUser.Activated {
+			app.unauthorizedAccessInactiveUserResponse(w, r)
 			return
 		}
 
 		next.ServeHTTP(w, r)
 	}
+	return app.requiredNonAnonymousUser(fn)
+}
+
+func (app *application) requirePermission(reqPermission string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.Background()
+		nUser := app.GetUserContext(r)
+
+		perms, err := app.models.Permissions.GetAllPermsForUser(ctx, nUser.ID)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrorRecordNotFound):
+				app.notPermittedResponse(w, r)
+				return
+			default:
+				app.serverErrorResponse(w, r, err)
+				return
+			}
+		}
+		ok := perms.IncludesPrem(reqPermission)
+		if !ok {
+			app.notPermittedResponse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	}
+}
+
+func (app *application) enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) promMetrics(path string, next http.Handler) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pTimer := prometheus.NewTimer(promHttpDuration.WithLabelValues(path))
+		promHttpTotalRequests.WithLabelValues(path).Inc()
+		metrics := httpsnoop.CaptureMetrics(next, w, r)
+		promHttpTotalResponse.WithLabelValues().Inc()
+		promHttpResponseStatus.WithLabelValues(strconv.Itoa(metrics.Code)).Inc()
+		pTimer.ObserveDuration()
+	})
 }
