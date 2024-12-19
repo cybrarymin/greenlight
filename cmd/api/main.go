@@ -52,6 +52,7 @@ type config struct {
 		DBMaxIdleConnCount   int
 		DBMaxIdleConnTimeout time.Duration
 		DBLogs               bool
+
 	}
 	rateLimit struct {
 		globalRateLimit    int64
@@ -99,6 +100,7 @@ func Api() {
 			DBMaxIdleConnCount,
 			DBMaxIdleConnTimeout,
 			DBLogs,
+
 		},
 		rateLimit: struct {
 			globalRateLimit    int64
@@ -121,6 +123,7 @@ func Api() {
 			SMTPUserName: SMTPUserName,
 			SMTPPassword: SMTPPassword,
 			EmailSender:  EmailSender,
+
 		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
