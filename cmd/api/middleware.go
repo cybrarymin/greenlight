@@ -197,11 +197,14 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 
 func (app *application) promMetrics(path string, next http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// This will consider a timer for histogram and summary metric times
+		// defer function will will expose the metrics sine the timer has been set.
 		pTimer := prometheus.NewTimer(promHttpDuration.WithLabelValues(path))
+		defer pTimer.ObserveDuration()
 		promHttpTotalRequests.WithLabelValues(path).Inc()
 		metrics := httpsnoop.CaptureMetrics(next, w, r)
 		promHttpTotalResponse.WithLabelValues().Inc()
 		promHttpResponseStatus.WithLabelValues(strconv.Itoa(metrics.Code)).Inc()
-		pTimer.ObserveDuration()
+
 	})
 }

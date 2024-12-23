@@ -9,12 +9,13 @@ import (
 
 var (
 	promHttpTotalRequests = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
+		prometheus.CounterOpts{ // metric name will be Namespace_Name
 			Namespace: "http",
 			Name:      "requests_total",
-			Help:      "Number of HTTP request by path",
+			Help:      "Number of HTTP request by path", // description of the metric
 		},
 		[]string{"path"}) // labels to be added to the metric
+
 	promHttpTotalResponse = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "http",
@@ -33,6 +34,7 @@ var (
 		Namespace: "http",
 		Name:      "response_time_seconds",
 		Help:      "Duration of HTTP requests.",
+		Buckets:   prometheus.DefBuckets,
 	}, []string{"path"})
 
 	promApplicationVersion = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -40,6 +42,7 @@ var (
 		Name:      "info",
 		Help:      "Application binary version",
 	}, []string{"version"})
+
 	promDbStatus = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "database",
 		Name:      "connection_status",
