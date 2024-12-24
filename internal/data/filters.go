@@ -17,7 +17,7 @@ type PaginationMeta struct {
 	FirstPage    int `json:"first_page,omitempty"`
 	LastPage     int `json:"last_page,omitempty"`
 	TotalRecords int `json:"total_records,omitempty"`
-	pageSize     int `json:"page_size,omitempty"`
+	PageSize     int `json:"page_size,omitempty"`
 	CurrentPage  int `json:"current_page,omitempty"`
 }
 
@@ -56,6 +56,6 @@ func (f *Filters) PaginationMetaData(totalRecords int) PaginationMeta {
 	f.PaginationMeta.CurrentPage = f.Page
 	f.PaginationMeta.LastPage = int(math.Ceil(float64(totalRecords) / float64(f.PageSize)))
 	f.PaginationMeta.TotalRecords = totalRecords
-	f.PaginationMeta.pageSize = f.pageSize
+	f.PaginationMeta.PageSize = f.PageSize
 	return f.PaginationMeta
 }

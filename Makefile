@@ -1,6 +1,10 @@
 ## help: print the help message
 -include .envrc # -include will include .envrc but if it doesn't exist it won't return error. .envrc usually is not commited in git so to avoid pipeline failure we do this
 
+#================================================================#
+# HELPERS
+#================================================================#
+
 # always use helo as the first target. Because make command without any target will run first target defined in it. "make" will equal to "make help"
 .PHONY: help # .PHONY for each target will teach make if we have a local file or directory that names help pls don't consider them and use the target we defined cause make command can't dinstingush the directory or file from targets we define inside makefile and it get's confused
 help: # @ before the command will not echo the command itself when we run make <target> command
@@ -11,6 +15,11 @@ help: # @ before the command will not echo the command itself when we run make <
 prerequsite_confirm:
 	@echo -n 'Are you sure? [y/N] ' && read ans && [ $${ans:-N} = y ]
 
+
+
+#================================================================#
+# DEVELOPMENT
+#================================================================#
 ## run/api: run the application
 .PHONY: run/api
 run/api:
@@ -27,3 +36,21 @@ db/migrations/up: prerequsite_confirm
 db/migrations/create:
 	@echo "Create a new sequenced migration...."
 	migrate create -dir=./migrations -ext=.sql -seq ${migration_name} # migration make command argument
+
+
+#================================================================#
+# QUALITY CHECK AND LINTING
+#================================================================#
+.PHONY: audit
+audit:
+	@echo "Tidying and verifying golang packages and module dependencies..."
+	go mod tidy
+	go mod verify
+	@echo "Formatting codes..."
+	go fmt ./...
+	@echo "Vetting codes..."
+	go vet ./...
+	@echo "Static Checking of the code..."
+	staticcheck ./...
+	@echo "Running tests..."
+	go test -race -vet=off ./...

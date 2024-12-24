@@ -77,11 +77,6 @@ func (app *application) authenticationRequiredResposne(w http.ResponseWriter, r 
 	app.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 
-func (app *application) unauthorizedAccessResponse(w http.ResponseWriter, r *http.Request) {
-	message := "unauthorized access"
-	app.errorResponse(w, r, http.StatusUnauthorized, message)
-
-}
 func (app *application) unauthorizedAccessInactiveUserResponse(w http.ResponseWriter, r *http.Request) {
 	message := "user must be activated to access this resource"
 	app.errorResponse(w, r, http.StatusForbidden, message)

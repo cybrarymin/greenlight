@@ -19,7 +19,7 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/movies", app.promMetrics("/v1/movies", app.Auth(app.requireActivatedUser(app.requirePermission("movies:read", app.listMovieHandler)))))
 	router.HandlerFunc(http.MethodGet, "/v1/movies/:id", app.promMetrics("/v1/movies", app.Auth(app.requireActivatedUser(app.requirePermission("movies:read", app.showMovieHandler)))))
 	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.promMetrics("/v1/movies", app.Auth(app.requireActivatedUser(app.requirePermission("movies:write", app.updateMovieHandler)))))
-	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.promMetrics("/v1/movies", app.Auth(app.requireActivatedUser(app.requirePermission("movies:write", app.updateMovieHandler)))))
+	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.promMetrics("/v1/movies", app.Auth(app.requireActivatedUser(app.requirePermission("movies:write", app.deleteMovieHandler)))))
 
 	// User Handlers
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.promMetrics("/v1/users", app.Auth(app.registerUserHandler)))
