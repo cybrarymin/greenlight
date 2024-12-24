@@ -8,7 +8,7 @@ func (app *application) healthcheckHandler(w http.ResponseWriter, r *http.Reques
 	data := map[string]string{
 		"status":      "available",
 		"environment": Env,
-		"version":     version,
+		"version":     Version,
 	}
 	err := app.writeJson(w, http.StatusOK, envelope{
 		"health": data,

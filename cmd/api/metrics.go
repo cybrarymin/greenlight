@@ -73,5 +73,5 @@ func promInit(db *bun.DB) {
 		}
 	}()
 
-	promApplicationVersion.WithLabelValues(version).Set(1)
+	promApplicationVersion.WithLabelValues(Version).Set(1)
 }

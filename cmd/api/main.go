@@ -22,7 +22,8 @@ import (
 	"github.com/uptrace/bun/extra/bunzerolog"
 )
 
-const version = "1.0.0"
+var Version = "local"
+var BuildTime string
 
 var (
 	ListenPort           int
@@ -41,6 +42,7 @@ var (
 	SMTPUserName         string
 	SMTPPassword         string
 	EmailSender          string
+	VersionDisplay       bool
 )
 
 type config struct {

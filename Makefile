@@ -21,12 +21,16 @@ prerequsite_confirm:
 # DEVELOPMENT
 #================================================================#
 ## build/api: building the application
+current_time = $(shell date +"%Y-%m-%dT%H:%M:%S%z")
+git_version = $(shell git describe --always --long --dirty --tags 2>/dev/null; if [[ $$? != 0 ]]; then git describe --always --dirty; fi)
+
+Linkerflags = -s -X github.com/cybrarymin/greenlight/cmd/api.BuildTime=${current_time} -X github.com/cybrarymin/greenlight/cmd/api.Version=${git_version}
 .PHONY: build/api
 build/api:
 	@go mod tidy
-	@GOOS=linux GOARCH=amd64 go build -o=./bin/greenlight-linux-amd64 ./
-	@GOOS=darwin GOARCH=arm64 go build -o=./bin/greenlight-darwin-arm64 ./
-	@go build -o=./bin/greenlight-local-compatible ./
+	GOOS=linux GOARCH=amd64 go build -ldflags="${Linkerflags}" -o=./bin/greenlight-linux-amd64 ./
+	GOOS=darwin GOARCH=arm64 go build -ldflags="${Linkerflags}" -o=./bin/greenlight-darwin-arm64 ./
+	go build -o=./bin/greenlight-local-compatible -ldflags="${Linkerflags}" ./
 
 ## run/api: run the application
 .PHONY: run/api
@@ -41,7 +45,7 @@ db/migrations/up: prerequsite_confirm
 
 ## db/migrations/create migration_name=<NAME_OF_THE_MIGRATION>: creating new migration file 
 .PHONY: db/migrations/create
-db/migrations/create:
+db/migrations/create:`
 	@echo "Create a new sequenced migration...."
 	migrate create -dir=./migrations -ext=.sql -seq ${migration_name} # migration make command argument
 

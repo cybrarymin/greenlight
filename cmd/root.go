@@ -4,10 +4,12 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/cybrarymin/greenlight/cmd/api"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +26,17 @@ to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
+		if api.VersionDisplay {
+			fmt.Printf("Version:   %s \nBuild time:   %v\n", api.Version, api.BuildTime)
+			return
+		}
 		api.Api()
+	},
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if !api.VersionDisplay && api.DBDSN == "" {
+			return errors.New("--db-connection-string option is required.")
+		}
+		return nil
 	},
 }
 
@@ -49,8 +61,7 @@ func init() {
 	rootCmd.Flags().IntVar(&api.ListenPort, "port", 8080, "port to listen on")
 	rootCmd.Flags().StringVar(&api.Env, "env", "development", "environment (development|staging|production)")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	rootCmd.PersistentFlags().StringVar(&api.DBDSN, "db-connection-string", "", "postgres database connection string")
-	rootCmd.MarkPersistentFlagRequired("db-connection-string")
+	rootCmd.Flags().StringVar(&api.DBDSN, "db-connection-string", "", "postgres database connection string")
 	rootCmd.Flags().IntVar(&api.DBMaxConnCount, "db-max-conn", 25, "maximum idle and active connection client can have to the database")
 	rootCmd.Flags().IntVar(&api.DBMaxIdleConnCount, "db-idle-max-conn", 25, "maximum idle connection client can have to the database")
 	rootCmd.Flags().DurationVar(&api.DBMaxIdleConnTimeout, "db-idle-conn-timeout", time.Minute*15, "maximum amount of time an idle connection will exist")
@@ -64,4 +75,5 @@ func init() {
 	rootCmd.Flags().StringVar(&api.SMTPUserName, "smtp-username", "", "smtp-username")
 	rootCmd.Flags().StringVar(&api.SMTPPassword, "smtp-password", "", "smtp-pass")
 	rootCmd.Flags().StringVar(&api.EmailSender, "smtp-sender-address", "no-reply@greenlight.com", "sender email information to be represented to the email receiver")
+	rootCmd.Flags().BoolVar(&api.VersionDisplay, "version", false, "show the version of the application")
 }
