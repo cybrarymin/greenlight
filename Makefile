@@ -20,6 +20,14 @@ prerequsite_confirm:
 #================================================================#
 # DEVELOPMENT
 #================================================================#
+## build/api: building the application
+.PHONY: build/api
+build/api:
+	@go mod tidy
+	@GOOS=linux GOARCH=amd64 go build -o=./bin/greenlight-linux-amd64 ./
+	@GOOS=darwin GOARCH=arm64 go build -o=./bin/greenlight-darwin-arm64 ./
+	@go build -o=./bin/greenlight-local-compatible ./
+
 ## run/api: run the application
 .PHONY: run/api
 run/api:
@@ -39,7 +47,7 @@ db/migrations/create:
 
 
 #================================================================#
-# QUALITY CHECK AND LINTING
+# QUALITY CHECK , LINTING, Vendoring
 #================================================================#
 .PHONY: audit
 audit:
@@ -54,3 +62,11 @@ audit:
 	staticcheck ./...
 	@echo "Running tests..."
 	go test -race -vet=off ./...
+
+.PHONY: vendor
+vendor:
+	@echo "Tidying and verifying golang packages and module dependencies..."
+	go mod verify
+	go mod tidy
+	@echo "Vendoring all golang dependency modules and packages..."
+	go mod vendor
