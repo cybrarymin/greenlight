@@ -34,7 +34,10 @@ to quickly create a Cobra application.`,
 	},
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if !api.VersionDisplay && api.DBDSN == "" {
-			return errors.New("--db-connection-string option is required.")
+			return errors.Errorf("--db-connection-string option is required.")
+		}
+		if api.JWTKEY == "" {
+			return errors.Errorf("--jwt-key option is required")
 		}
 		return nil
 	},
@@ -76,4 +79,5 @@ func init() {
 	rootCmd.Flags().StringVar(&api.SMTPPassword, "smtp-password", "", "smtp-pass")
 	rootCmd.Flags().StringVar(&api.EmailSender, "smtp-sender-address", "no-reply@greenlight.com", "sender email information to be represented to the email receiver")
 	rootCmd.Flags().BoolVar(&api.VersionDisplay, "version", false, "show the version of the application")
+	rootCmd.Flags().StringVar(&api.JWTKEY, "jwt-key", "", "defining jwt key string to be used for issuing jwt token")
 }

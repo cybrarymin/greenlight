@@ -66,13 +66,19 @@ func (app *application) invalidActivationTokenResponse(w http.ResponseWriter, r 
 }
 
 func (app *application) invalidAuthenticationCredResponse(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("WWW-Authenticate", "Bearer")
+	w.Header().Set("WWW-Authenticate", "Bearer Jwt")
 	message := "invalid authentication creds or token"
 	app.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 
+func (app *application) invalidJWTTokenSignatureResponse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("WWW-Authenticate", "Bearer Jwt")
+	message := "invalid jwt token signature."
+	app.errorResponse(w, r, http.StatusUnauthorized, message)
+}
+
 func (app *application) authenticationRequiredResposne(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("WWW-Authenticate", "Bearer")
+	w.Header().Set("WWW-Authenticate", "Bearer Jwt")
 	message := "authentication required"
 	app.errorResponse(w, r, http.StatusUnauthorized, message)
 }

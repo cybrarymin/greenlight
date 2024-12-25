@@ -12,7 +12,7 @@ func (app *application) routes() http.Handler {
 
 	router.NotFound = http.HandlerFunc(app.notFoundResponse)
 	router.MethodNotAllowed = http.HandlerFunc(app.methodNotAllowedResponse)
-	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.promMetrics("/v1/healthcheck", app.Auth(app.healthcheckHandler)))
+	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.promMetrics("/v1/healthcheck", app.JWTAuth(app.healthcheckHandler)))
 
 	// Movies Handlers
 	router.HandlerFunc(http.MethodPost, "/v1/movies", app.promMetrics("/v1/movies", app.Auth(app.requireActivatedUser(app.requirePermission("movies:write", app.createMovieHandler)))))
@@ -33,6 +33,10 @@ func (app *application) routes() http.Handler {
 	// createBearerTokenHandler has basic authentication within itself
 	router.HandlerFunc(http.MethodPost, "/v1/tokens/auth", app.promMetrics("/v1/tokens/auth", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		app.createBearerTokenHandler(w, r)
+	})))
+
+	router.HandlerFunc(http.MethodPost, "/v1/tokens/jwt", app.promMetrics("/v1/tokens/jwt", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		app.createJWTTokenHandler(w, r)
 	})))
 
 	// application metrics Handlers

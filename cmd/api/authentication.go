@@ -7,7 +7,11 @@ import (
 	"time"
 
 	"github.com/cybrarymin/greenlight/internal/data"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
+
+var JWTKEY string
 
 func (app *application) createBearerTokenHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
@@ -28,6 +32,62 @@ func (app *application) createBearerTokenHandler(w http.ResponseWriter, r *http.
 
 }
 
+type customClaims struct {
+	Email string `json:"email"`
+	jwt.RegisteredClaims
+}
+
+/*
+This function is used comletely to implement jwt.claimsValidator.
+When we define this function for our customClaim then jwt.Validator will validate our custom claim after the registered claim based on this function
+*/
+func (c *customClaims) Validate() error {
+	if ok := data.EmailRX.MatchString(c.Email); !ok {
+		return errors.New("invalid email claim on jwt token")
+	}
+	return nil
+}
+
+/*
+Authenticating user using basic authentication method. If user is valid it's gonna issue a JWT Token to the user
+*/
+func (app *application) createJWTTokenHandler(w http.ResponseWriter, r *http.Request) {
+
+	ok, nUser := app.BasicAuth(w, r)
+	if !ok {
+		return
+	}
+	claims := customClaims{
+		Email: nUser.Email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "greenlight.example.com",
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24 * 3)),
+			Subject:   nUser.Email,
+			Audience:  []string{"greenlight.example.com"},
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			ID:        uuid.New().String(),
+		},
+	}
+
+	jToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims, func(t *jwt.Token) {})
+
+	signedToken, err := jToken.SignedString([]byte(JWTKEY))
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	err = app.writeJson(w, http.StatusOK, envelope{"result": map[string]string{"token": signedToken}}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+}
+
+/*
+Authenticates the user using basic authentication method.
+in case of successfull authentication it returns ok plus userinfo
+*/
 func (app *application) BasicAuth(w http.ResponseWriter, r *http.Request) (bool, *data.User) {
 	ctx := context.Background()
 	email, pass, ok := r.BasicAuth()

@@ -14,6 +14,7 @@ import (
 
 	"github.com/cybrarymin/greenlight/internal/data"
 	"github.com/felixge/httpsnoop"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/time/rate"
 )
@@ -138,6 +139,61 @@ func (app *application) Auth(next http.HandlerFunc) http.HandlerFunc {
 		next.ServeHTTP(w, r)
 	}
 }
+
+func (app *application) JWTAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.Background()
+		headerValue := r.Header.Get("Authorization")
+		if headerValue == "" {
+			r = app.SetUserContext(r, data.AnonymousUser)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		headerValues := strings.Split(headerValue, " ")
+		if len(headerValues) != 2 && headerValues[0] != "Bearer" {
+			app.invalidAuthenticationCredResponse(w, r)
+			return
+		}
+		jToken := headerValues[1]
+		// ParseWithClaims will fetch the token and keystring of the token
+		// It will verify the signature to make sure token is valid
+		// It will verify all the registered claims of jwt.Registered claims
+		verifiedToken, err := jwt.ParseWithClaims(jToken, &customClaims{}, func(t *jwt.Token) (interface{}, error) {
+			return []byte(JWTKEY), nil
+		})
+		if err != nil {
+			switch {
+			case errors.Is(err, jwt.ErrTokenSignatureInvalid):
+				app.invalidJWTTokenSignatureResponse(w, r)
+				return
+			default:
+				app.invalidAuthenticationCredResponse(w, r)
+				return
+			}
+		}
+		if !verifiedToken.Valid {
+			app.invalidAuthenticationCredResponse(w, r)
+			return
+		}
+
+		user, err := app.models.Users.GetByEmail(verifiedToken.Claims.(*customClaims).Email, ctx)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrorRecordNotFound):
+				app.invalidAuthenticationCredResponse(w, r)
+				return
+			default:
+				app.serverErrorResponse(w, r, err)
+				return
+			}
+		}
+		r = app.SetUserContext(r, user)
+
+		next.ServeHTTP(w, r)
+	}
+}
+
 func (app *application) requiredNonAnonymousUser(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		nUser := app.GetUserContext(r)

@@ -35,7 +35,7 @@ build/api:
 ## run/api: run the application
 .PHONY: run/api
 run/api:
-	@go run main.go --db-connection-string="postgres://postgres:m.amin24242@localhost:5432/greenlight?sslmode=disable" --smtp-server-addr="sandbox.smtp.mailtrap.io" --smtp-username="16280f8e9645e4" --smtp-password="7a615205806af2"
+	@go run main.go --db-connection-string="${DATABASE_DSN}" --smtp-server-addr="${SMTP_SERVER}" --smtp-username="${SMTP_USERNAME}" --smtp-password="${SMTP_PASSWORD}" --jwt-key="${JWT_KEYSTRING}"
 
 ## /db/migrations/up: running database migrations to create table and indexes
 .PHONY: db/migrations/up
