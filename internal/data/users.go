@@ -12,6 +12,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -193,6 +196,9 @@ func (u *UserModel) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (u *UserModel) GetUserByToken(ctx context.Context, tokenPlaintext string, tokenScope string) (*User, error) {
+	ctx, span := otel.Tracer("database.tracer").Start(ctx, "database.getUserByToken.span")
+	defer span.End()
+
 	nToken := &Token{}
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second*3)
 	defer cancelFunc()
@@ -203,11 +209,16 @@ func (u *UserModel) GetUserByToken(ctx context.Context, tokenPlaintext string, t
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
+			span.RecordError(err)
 			return nil, ErrorRecordNotFound
 		default:
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "error in interaction with database")
 			return nil, err
 		}
 	}
+	span.SetAttributes(attribute.String("user.name", nToken.User.Name))
+	span.SetAttributes(attribute.String("user.email", nToken.User.Email))
 	return nToken.User, nil
 }
 

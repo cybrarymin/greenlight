@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,6 +19,8 @@ import (
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/extra/bunzerolog"
+	"github.com/uptrace/opentelemetry-go-extra/otelsql"
+	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
 )
 
 var Version = "local"
@@ -162,9 +163,13 @@ func Api() {
 	}
 
 	promInit(db)
+	otelShutdown, err := setupOTelSDK(ctx)
+	if err != nil {
+		app.log.Error().Err(err)
+	}
 
 	shutdownErr := make(chan error)
-	go app.gracefulShutdown(srv, shutdownErr)
+	go app.gracefulShutdown(srv, shutdownErr, otelShutdown)
 
 	app.log.Info().Msg("starting the http server .....")
 	err = srv.ListenAndServe()
@@ -179,7 +184,9 @@ func Api() {
 }
 
 func openDB(ctx context.Context, cfg *config) (*bun.DB, error) {
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(cfg.db.dbDsn)))
+	sqldb := otelsql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(cfg.db.dbDsn)),
+		otelsql.WithAttributes(semconv.DBSystemPostgreSQL),
+	)
 	db := bun.NewDB(sqldb, pgdialect.New(), bun.WithDiscardUnknownColumns())
 	db.SetMaxOpenConns(DBMaxConnCount)
 	db.SetMaxIdleConns(DBMaxIdleConnCount)
@@ -191,7 +198,8 @@ func openDB(ctx context.Context, cfg *config) (*bun.DB, error) {
 	return db, nil
 }
 
-func (app *application) gracefulShutdown(srv *http.Server, shutdownErr chan error) {
+func (app *application) gracefulShutdown(srv *http.Server, shutdownErr chan error, shutdown func(context.Context) error) {
+
 	// Create a channel to redirect signal to it.
 	quit := make(chan os.Signal, 1)
 

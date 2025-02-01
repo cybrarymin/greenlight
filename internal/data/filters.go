@@ -1,8 +1,11 @@
 package data
 
 import (
+	"context"
 	"math"
 	"strings"
+
+	"go.opentelemetry.io/otel"
 )
 
 type Filters struct {
@@ -51,7 +54,9 @@ func (f Filters) offset() int {
 	return (f.Page - 1) * f.PageSize
 }
 
-func (f *Filters) PaginationMetaData(totalRecords int) PaginationMeta {
+func (f *Filters) PaginationMetaData(ctx context.Context, totalRecords int) PaginationMeta {
+	_, span := otel.Tracer("paginationMetaData.tracer").Start(ctx, "paginationMetaData.span")
+	defer span.End()
 	f.PaginationMeta.FirstPage = 1
 	f.PaginationMeta.CurrentPage = f.Page
 	f.PaginationMeta.LastPage = int(math.Ceil(float64(totalRecords) / float64(f.PageSize)))

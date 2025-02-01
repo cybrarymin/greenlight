@@ -1,16 +1,20 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/cybrarymin/greenlight/internal/data"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("registerUser.handler.tracer").Start(r.Context(), "registerUser.handler.span")
+	span.End()
+
 	nVal := data.NewValidator()
 
 	var nInput struct {
@@ -21,6 +25,8 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 	err := app.readJson(w, r, &nInput)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, otelunprocessableErr)
 		app.badRequestResponse(w, r, err)
 		return
 	}
@@ -32,11 +38,14 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 	err = nUser.Password.Set(nInput.Password)
 	if err != nil {
+		span.RecordError(err)
 		switch {
 		case errors.Is(err, data.ErrorPasswordTooLong):
+			span.SetStatus(codes.Error, otelunprocessableErr)
 			app.badRequestResponse(w, r, err)
 			return
 		default:
+			span.SetStatus(codes.Error, "error on new password setup")
 			app.serverErrorResponse(w, r, err)
 			return
 		}
@@ -45,13 +54,16 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	data.ValidateUser(nVal, &nUser)
 	valid := nVal.Valid()
 	if !valid {
+		span.RecordError(errors.New(createKeyValuePairs(nVal.Errors)))
+		span.SetStatus(codes.Error, otelunprocessableErr)
 		app.failedValidationResponse(w, r, nVal.Errors)
 		return
 	}
 
-	ctx := context.Background()
 	err = app.models.Users.Insert(ctx, &nUser)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, otelDBErr)
 		switch {
 		case errors.Is(err, data.ErrorDuplicateEmail):
 			nVal.AddError("email", "user with current email already exists")
@@ -65,15 +77,18 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 	err = app.models.Permissions.AddPermForUser(ctx, nUser.ID, "movies:read")
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, otelDBErr)
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
 	app.BackgroundJob(func() {
 
-		ctx := context.Background()
 		nToken, err := app.models.Tokens.New(ctx, time.Hour*72, nUser.ID, data.ActivationScope)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, otelDBErr)
 			app.log.Error().Err(err).Msg(fmt.Sprintf("token creation procedure failed for user %v", nUser.Email))
 			return
 		}
@@ -108,6 +123,8 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 }
 
 func (app *application) ListUserHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("listUser.handler.tracer").Start(r.Context(), "listUser.handler.span")
+	defer span.End()
 	nValidator := data.NewValidator()
 	var input struct {
 		Name  string
@@ -121,19 +138,28 @@ func (app *application) ListUserHandler(w http.ResponseWriter, r *http.Request) 
 	input.Filters.SortSafeList = []string{"id", "created_at", "name", "email", "-id", "-created_at", "-name", "-email"}
 	input.Name = app.readString(qs, "name", "")
 	input.Email = app.readString(qs, "email", "")
+	input.Filters.ValidateFilters(nValidator)
+	if !nValidator.Valid() {
+		span.RecordError(errors.New(createKeyValuePairs(nValidator.Errors)))
+		span.SetStatus(codes.Error, otelunprocessableErr)
+		app.failedValidationResponse(w, r, nValidator.Errors)
+		return
+	}
 
 	userList := &data.Users{}
-	count, err := app.models.Users.List(context.Background(), userList, input.Name, input.Email, &input.Filters)
+	count, err := app.models.Users.List(ctx, userList, input.Name, input.Email, &input.Filters)
 	if err != nil {
+		span.RecordError(err)
 		switch {
 		case errors.Is(err, data.ErrorRecordNotFound):
-			break
+			span.SetStatus(codes.Ok, otelDBNotFoundInfo)
 		default:
+			span.SetStatus(codes.Error, otelDBErr)
 			app.serverErrorResponse(w, r, err)
 			return
 		}
 	}
-	pMeta := input.Filters.PaginationMetaData(count)
+	pMeta := input.Filters.PaginationMetaData(ctx, count)
 	err = app.writeJson(w, http.StatusOK, envelope{"Metadata": pMeta, "Result": userList}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
@@ -142,18 +168,25 @@ func (app *application) ListUserHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (app *application) DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("deleteUser.handler.tracer").Start(r.Context(), "deleteUser.handler.span")
+	defer span.End()
 	uuid, err := app.readUUIDParam(r)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, otelunprocessableErr)
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	err = app.models.Users.Delete(context.Background(), uuid)
+	err = app.models.Users.Delete(ctx, uuid)
 	if err != nil {
+		span.RecordError(err)
 		switch {
 		case errors.Is(err, data.ErrorRecordNotFound):
+			span.SetStatus(codes.Ok, otelDBNotFoundInfo)
 			app.notFoundResponse(w, r)
 			return
 		default:
+			span.SetStatus(codes.Error, otelDBErr)
 			app.serverErrorResponse(w, r, err)
 			return
 		}

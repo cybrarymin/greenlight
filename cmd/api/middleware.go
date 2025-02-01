@@ -16,6 +16,11 @@ import (
 	"github.com/felixge/httpsnoop"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
 )
 
@@ -99,10 +104,12 @@ func (app *application) RateLimit(next http.Handler) http.Handler {
 
 func (app *application) Auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.Background()
+		ctx, span := otel.Tracer("auth.handler.tracer").Start(r.Context(), "auth.handler.span")
+		defer span.End()
 		headerValue := r.Header.Get("Authorization")
 
 		if headerValue == "" {
+			span.AddEvent("starting request with anonymous user")
 			r = app.SetUserContext(r, data.AnonymousUser)
 			next.ServeHTTP(w, r)
 			return
@@ -111,6 +118,7 @@ func (app *application) Auth(next http.HandlerFunc) http.HandlerFunc {
 		headerValues := strings.Split(headerValue, " ")
 
 		if len(headerValues) != 2 || headerValues[0] != "Bearer" {
+			span.SetStatus(codes.Error, "Invalid authentication header in request")
 			app.invalidAuthenticationCredResponse(w, r)
 			return
 		}
@@ -119,6 +127,7 @@ func (app *application) Auth(next http.HandlerFunc) http.HandlerFunc {
 		nValidator := data.NewValidator()
 		data.ValidateTokenPlaintext(nValidator, userToken)
 		if !nValidator.Valid() {
+			span.SetStatus(codes.Error, "Invalid authentication token")
 			app.invalidActivationTokenResponse(w, r)
 			return
 		}
@@ -130,10 +139,13 @@ func (app *application) Auth(next http.HandlerFunc) http.HandlerFunc {
 				app.invalidAuthenticationCredResponse(w, r)
 				return
 			default:
+				span.RecordError(err)
+				span.SetStatus(codes.Error, otelDBErr)
 				app.serverErrorResponse(w, r, err)
 				return
 			}
 		}
+		r = r.WithContext(ctx)
 		r = app.SetUserContext(r, user)
 
 		next.ServeHTTP(w, r)
@@ -208,12 +220,20 @@ func (app *application) requiredNonAnonymousUser(next http.HandlerFunc) http.Han
 func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
 	// defining fn as a function
 	fn := func(w http.ResponseWriter, r *http.Request) {
+		ctx, span := otel.Tracer("requireActivatedUser.handler.tracer").Start(r.Context(), "requireActivatedUser.handler.span")
+		defer span.End()
+
 		nUser := app.GetUserContext(r)
+		span.AddEvent("checking user activation status", trace.WithAttributes(
+			attribute.String("user.Email", nUser.Email),
+			attribute.String("user.Name", nUser.Name),
+		))
 		if !nUser.Activated {
 			app.unauthorizedAccessInactiveUserResponse(w, r)
 			return
 		}
 
+		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	}
 	return app.requiredNonAnonymousUser(fn)
@@ -221,16 +241,23 @@ func (app *application) requireActivatedUser(next http.HandlerFunc) http.Handler
 
 func (app *application) requirePermission(reqPermission string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.Background()
+		ctx, span := otel.Tracer("requirepermission.handler.tracer").Start(r.Context(), "requirepermission.handler.span")
+		defer span.End()
+
 		nUser := app.GetUserContext(r)
 
 		perms, err := app.models.Permissions.GetAllPermsForUser(ctx, nUser.ID)
 		if err != nil {
 			switch {
 			case errors.Is(err, data.ErrorRecordNotFound):
+				span.AddEvent("no record found",
+					trace.WithAttributes(attribute.String("user.email", nUser.Email)),
+				)
 				app.notPermittedResponse(w, r)
 				return
 			default:
+				span.RecordError(err)
+				span.SetStatus(codes.Error, otelDBErr)
 				app.serverErrorResponse(w, r, err)
 				return
 			}
@@ -240,6 +267,8 @@ func (app *application) requirePermission(reqPermission string, next http.Handle
 			app.notPermittedResponse(w, r)
 			return
 		}
+
+		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	}
 }
@@ -262,5 +291,33 @@ func (app *application) promMetrics(path string, next http.Handler) http.Handler
 		promHttpTotalResponse.WithLabelValues().Inc()
 		promHttpResponseStatus.WithLabelValues(strconv.Itoa(metrics.Code)).Inc()
 
+	})
+}
+
+// In case you don't want to use default otelhttp.Handler
+
+// func (app *application) otelHandler(path string, next http.Handler) http.HandlerFunc {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		// Otel Tracer will return the global tracer we set during SetupOtelSDK. Then we can consider a name for tracer and start it to create a span
+// 		ctx, span := otel.Tracer("otel.handler.tracer").Start(r.Context(), "otelHandler.span")
+// 		span.SetAttributes(
+// 			attribute.String("request.path", path),
+// 			attribute.String("client.addr", r.RemoteAddr),
+// 		)
+// 		r = r.WithContext(ctx)
+// 		defer span.End()
+
+// 		span.AddEvent("start processing request")
+// 		next.ServeHTTP(w, r)
+// 		span.AddEvent("finished processing request")
+
+// 	})
+// }
+
+func (app *application) otelHandler(next http.Handler) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// using otelhttp default package to wrap the handler instead of creating a handler ourselves from scratch
+		instrument := otelhttp.NewHandler(next, "otel.instrumented.handler")
+		instrument.ServeHTTP(w, r)
 	})
 }

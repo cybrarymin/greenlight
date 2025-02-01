@@ -80,4 +80,8 @@ func init() {
 	rootCmd.Flags().StringVar(&api.EmailSender, "smtp-sender-address", "no-reply@greenlight.com", "sender email information to be represented to the email receiver")
 	rootCmd.Flags().BoolVar(&api.VersionDisplay, "version", false, "show the version of the application")
 	rootCmd.Flags().StringVar(&api.JWTKEY, "jwt-key", "", "defining jwt key string to be used for issuing jwt token")
+	rootCmd.Flags().StringVar(&api.OtlpHost, "otlp-host", "localhost", "opentelemetry protocol host endpoint")
+	rootCmd.Flags().StringVar(&api.OtlpHTTPPort, "otlp-http-port", "4318", "opentelemetry protocol host port ")
+	rootCmd.Flags().StringVar(&api.OtlpApplicationName, "otlp-appname", "greenlight_app", "name for the application to be represented in the opentelemetry backends")
+
 }

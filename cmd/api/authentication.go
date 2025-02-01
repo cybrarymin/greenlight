@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -9,18 +8,25 @@ import (
 	"github.com/cybrarymin/greenlight/internal/data"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 var JWTKEY string
 
 func (app *application) createBearerTokenHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx, span := otel.Tracer("createBearerToken.handler.tracer").Start(r.Context(), "createBearerToken.handler.span")
+	defer span.End()
+
 	ok, nUser := app.BasicAuth(w, r)
 	if !ok {
 		return
 	}
 	nBToken, err := app.models.Tokens.New(ctx, time.Hour*24, nUser.ID, data.AuthenticationScope)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, otelDBErr)
 		app.serverErrorResponse(w, r, err)
 		return
 	}
@@ -52,6 +58,8 @@ func (c *customClaims) Validate() error {
 Authenticating user using basic authentication method. If user is valid it's gonna issue a JWT Token to the user
 */
 func (app *application) createJWTTokenHandler(w http.ResponseWriter, r *http.Request) {
+	_, span := otel.Tracer("createJWTToken.handler.tracer").Start(r.Context(), "createJWTToken.handler.span")
+	defer span.End()
 
 	ok, nUser := app.BasicAuth(w, r)
 	if !ok {
@@ -69,6 +77,11 @@ func (app *application) createJWTTokenHandler(w http.ResponseWriter, r *http.Req
 			ID:        uuid.New().String(),
 		},
 	}
+	span.SetAttributes(attribute.String("claims.email", claims.Email))
+	span.SetAttributes(attribute.String("claims.issuer", claims.Issuer))
+	span.SetAttributes(attribute.String("claims.subject", claims.Subject))
+	span.SetAttributes(attribute.StringSlice("claims.audience", claims.Audience))
+	span.SetAttributes(attribute.String("claims.id", claims.ID))
 
 	jToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims, func(t *jwt.Token) {})
 
@@ -89,9 +102,12 @@ Authenticates the user using basic authentication method.
 in case of successfull authentication it returns ok plus userinfo
 */
 func (app *application) BasicAuth(w http.ResponseWriter, r *http.Request) (bool, *data.User) {
-	ctx := context.Background()
+	ctx, span := otel.Tracer("basicAuth.handler.tracer").Start(r.Context(), "basicAuth.handler.span")
+	defer span.End()
+
 	email, pass, ok := r.BasicAuth()
 	if !ok {
+		span.SetStatus(codes.Error, otelAuthFailureErr)
 		app.invalidAuthenticationCredResponse(w, r)
 		return false, nil
 	}
@@ -100,17 +116,22 @@ func (app *application) BasicAuth(w http.ResponseWriter, r *http.Request) (bool,
 	data.ValidateEmail(nValidator, email)
 	data.ValidatePasswordPlaintext(nValidator, pass)
 	if !nValidator.Valid() {
+		span.RecordError(errors.New(createKeyValuePairs(nValidator.Errors)))
+		span.SetStatus(codes.Error, otelAuthFailureErr)
 		app.invalidAuthenticationCredResponse(w, r)
 		return false, nil
 	}
 
 	nUser, err := app.models.Users.GetByEmail(email, ctx)
 	if err != nil {
+		span.RecordError(err)
 		switch {
 		case errors.Is(err, data.ErrorRecordNotFound):
+			span.SetStatus(codes.Error, otelAuthFailureErr)
 			app.invalidActivationTokenResponse(w, r)
 			return false, nil
 		default:
+			span.SetStatus(codes.Error, otelDBErr)
 			app.serverErrorResponse(w, r, err)
 			return false, nil
 		}
@@ -123,10 +144,15 @@ func (app *application) BasicAuth(w http.ResponseWriter, r *http.Request) (bool,
 
 	ok, err = inputPass.Match()
 	if !ok && err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, otelAuthFailureErr)
 		app.serverErrorResponse(w, r, err)
 		return false, nil
 	}
 	if !ok && err == nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("user.email", email))
+		span.SetStatus(codes.Error, otelAuthFailureErr)
 		app.invalidAuthenticationCredResponse(w, r)
 		return false, nil
 	}

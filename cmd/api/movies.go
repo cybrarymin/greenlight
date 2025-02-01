@@ -7,9 +7,16 @@ import (
 	"net/http"
 
 	"github.com/cybrarymin/greenlight/internal/data"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("createMovie.handler.tracer").Start(r.Context(), "createMovie.handler.span")
+	defer span.End()
+
 	var input struct {
 		Title   string
 		Year    int32
@@ -18,6 +25,8 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 	err := app.readJson(w, r, &input)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, otelunprocessableErr)
 		app.badRequestResponse(w, r, err)
 		return
 	}
@@ -30,12 +39,19 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	nvalidator := data.NewValidator()
 	movie.Validator(nvalidator)
 	if len(nvalidator.Errors) > 0 {
+		span.RecordError(errors.New(createKeyValuePairs(nvalidator.Errors)))
+		span.SetStatus(codes.Error, otelunprocessableErr)
 		app.errorResponse(w, r, http.StatusUnprocessableEntity, nvalidator.Errors)
 		return
 	}
 
-	err = app.models.Movies.Insert(context.Background(), &movie)
+	span.AddEvent("inserting movie to the database", trace.WithAttributes(
+		attribute.String("movie.title", movie.Title),
+	))
+	err = app.models.Movies.Insert(ctx, &movie)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, otelDBErr)
 		app.serverErrorResponse(w, r, err)
 		return
 	}
@@ -51,11 +67,16 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (app *application) listMovieHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("listMovie.handler.tracer").Start(r.Context(), "listMovie.handler.span")
+	defer span.End()
+
 	var input struct {
 		Title  string
 		Genres []string
 		data.Filters
 	}
+
+	span.AddEvent("reading and validating query parameters")
 	v := data.NewValidator()
 	qs := r.URL.Query()
 	input.Title = app.readString(qs, "title", "")
@@ -66,22 +87,29 @@ func (app *application) listMovieHandler(w http.ResponseWriter, r *http.Request)
 	input.Filters.SortSafeList = []string{"id", "title", "year", "runtime", "-id", "-title", "-year", "-runtime"}
 	input.Filters.ValidateFilters(v)
 	if !v.Valid() {
+		span.RecordError(errors.New(createKeyValuePairs(v.Errors)))
+		span.SetStatus(codes.Error, otelunprocessableErr)
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	movies, count, err := app.models.Movies.List(context.Background(), input.Title, input.Genres, &input.Filters)
+	span.AddEvent("querying database to get list of movies")
+	movies, count, err := app.models.Movies.List(ctx, input.Title, input.Genres, &input.Filters)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrorRecordNotFound):
+			span.RecordError(err)
+			span.SetStatus(codes.Ok, otelDBNotFoundInfo)
 			app.notFoundResponse(w, r)
 		default:
+			span.RecordError(err)
+			span.SetStatus(codes.Error, otelDBErr)
 			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
 
-	pMeta := input.Filters.PaginationMetaData(count)
+	pMeta := input.Filters.PaginationMetaData(ctx, count)
 
 	err = app.writeJson(w, http.StatusOK, envelope{"Metadata": pMeta, "Movies": movies}, nil)
 	if err != nil {
@@ -90,18 +118,27 @@ func (app *application) listMovieHandler(w http.ResponseWriter, r *http.Request)
 
 }
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("showMovie.handler.tracer").Start(r.Context(), "showMovie.handler.span")
+	defer span.End()
+
 	id, err := app.readIDParam(r)
 	if err != nil {
 		app.notFoundResponse(w, r)
 		return
 	}
-	movie, err := app.models.Movies.Select(context.Background(), id)
+	span.AddEvent("fetching movie information from database", trace.WithAttributes(attribute.Int64("movie.id", id)))
+	movie, err := app.models.Movies.Select(ctx, id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrorRecordNotFound):
+			span.RecordError(err)
+			span.SetStatus(codes.Ok, otelDBNotFoundInfo)
 			app.notFoundResponse(w, r)
 		default:
+			span.RecordError(err)
+			span.SetStatus(codes.Error, otelDBErr)
 			app.serverErrorResponse(w, r, err)
+
 		}
 		return
 	}
@@ -114,17 +151,26 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("showMovie.handler.tracer").Start(r.Context(), "showMovie.handler.span")
+	defer span.End()
+
 	id, err := app.readIDParam(r)
 	if err != nil {
 		app.notFoundResponse(w, r)
 		return
 	}
-	err = app.models.Movies.Delete(context.Background(), id)
+
+	span.AddEvent("deleting the movie from database", trace.WithAttributes(attribute.Int64("movie.id", id)))
+	err = app.models.Movies.Delete(ctx, id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrorRecordNotFound):
+			span.RecordError(err)
+			span.SetStatus(codes.Ok, otelDBNotFoundInfo)
 			app.notFoundResponse(w, r)
 		default:
+			span.RecordError(err)
+			span.SetStatus(codes.Error, otelDBErr)
 			app.serverErrorResponse(w, r, err)
 		}
 		return
@@ -137,17 +183,25 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("showMovie.handler.tracer").Start(r.Context(), "showMovie.handler.span")
+	defer span.End()
+
 	id, err := app.readIDParam(r)
 	if err != nil {
 		app.notFoundResponse(w, r)
 	}
 
-	nMovie, err := app.models.Movies.Select(context.Background(), id)
+	span.AddEvent("fetching the movie information from database to update", trace.WithAttributes(attribute.Int64("movie.id", id)))
+	nMovie, err := app.models.Movies.Select(ctx, id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrorRecordNotFound):
+			span.RecordError(err)
+			span.SetStatus(codes.Ok, otelDBNotFoundInfo)
 			app.notFoundResponse(w, r)
 		default:
+			span.RecordError(err)
+			span.SetStatus(codes.Error, otelDBErr)
 			app.serverErrorResponse(w, r, err)
 		}
 		return
@@ -162,6 +216,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 
 	err = app.readJson(w, r, &input)
 	if err != nil {
+		span.SetStatus(codes.Error, otelunprocessableErr)
 		app.badRequestResponse(w, r, err)
 		return
 	}
@@ -184,16 +239,19 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	nvalidator := data.NewValidator()
 	nMovie.Validator(nvalidator)
 	if len(nvalidator.Errors) > 0 {
+		span.RecordError(errors.New(createKeyValuePairs(nvalidator.Errors)))
+		span.SetStatus(codes.Error, otelunprocessableErr)
 		app.failedValidationResponse(w, r, nvalidator.Errors)
 		return
 	}
-
+	span.AddEvent("updating the movie in database", trace.WithAttributes(attribute.Int64("movie.id", id)))
 	err = app.models.Movies.Update(context.Background(), nMovie.ID, nMovie)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, otelDBErr)
 		switch {
 		case errors.Is(err, data.ErrEditConflict):
 			app.editConflictResponse(w, r)
-
 		default:
 			app.serverErrorResponse(w, r, err)
 		}

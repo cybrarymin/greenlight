@@ -170,3 +170,11 @@ func (app *application) readJson(w http.ResponseWriter, r *http.Request, dst int
 	}
 	return nil
 }
+
+func createKeyValuePairs(m map[string]string) string {
+	b := new(bytes.Buffer)
+	for key, value := range m {
+		fmt.Fprintf(b, "%s=\"%s\"\n", key, value)
+	}
+	return b.String()
+}
