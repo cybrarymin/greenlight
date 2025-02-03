@@ -5,11 +5,12 @@ import (
 	"errors"
 	"time"
 
+	"github.com/uptrace/bun"
 	"go.opentelemetry.io/otel"
+
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/log"
@@ -28,14 +29,17 @@ const (
 )
 
 var (
-	OtlpHost            string
-	OtlpHTTPPort        string
-	OtlpApplicationName string
+	OtlpTraceHost         string
+	OtlpHTTPTracePort     string
+	OtlpApplicationName   string
+	OtlpMetriceHost       string
+	OtlpHTTPMetricPort    string
+	OtlpHTTPMetricAPIPath string
 )
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, err error) {
+func setupOTelSDK(ctx context.Context, db *bun.DB) (shutdown func(context.Context) error, err error) {
 	var shutdownFuncs []func(context.Context) error
 
 	// shutdown calls cleanup functions registered via shutdownFuncs.
@@ -55,17 +59,17 @@ func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 		err = errors.Join(inErr, shutdown(ctx))
 	}
 
-	// Set up propagator.
+	// Setup propagator.
 	prop := newPropagator()
 	otel.SetTextMapPropagator(prop)
 
-	// Set up Jaeger exporter
+	// Setup trace provider.
+	// Setup Jaeger exporter
 	traceExporter, err := newJaegerTraceExporter(ctx)
 	if err != nil {
 		handleErr(err)
 		return
 	}
-	// Set up trace provider.
 	tracerProvider, err := newTraceProvider(traceExporter)
 	if err != nil {
 		handleErr(err)
@@ -75,12 +79,20 @@ func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
 	otel.SetTracerProvider(tracerProvider)
 
-	// Set up meter provider.
-	meterProvider, err := newMeterProvider()
+	// Setup prometheusOTLP exporter.
+	// Setup metric provider.
+	metricExporter, err := newPrometheusMetricExporter(ctx)
 	if err != nil {
 		handleErr(err)
 		return
 	}
+
+	meterProvider, err := newMeterProvider(metricExporter)
+	if err != nil {
+		handleErr(err)
+		return
+	}
+
 	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
 	otel.SetMeterProvider(meterProvider)
 
@@ -92,6 +104,13 @@ func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	}
 	shutdownFuncs = append(shutdownFuncs, loggerProvider.Shutdown)
 	global.SetLoggerProvider(loggerProvider)
+
+	// Initialize the metrics
+	err = initializeOtelMetrics(db)
+	if err != nil {
+		handleErr(err)
+		return
+	}
 
 	return
 }
@@ -106,7 +125,7 @@ func newPropagator() propagation.TextMapPropagator {
 func newJaegerTraceExporter(ctx context.Context) (trace.SpanExporter, error) {
 	// Create an exporter over HTTP for Jaeger endpoint. In latest version, Jaeger supports otlp endpoint
 	traceExporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint(OtlpHost+":"+OtlpHTTPPort),
+		otlptracehttp.WithEndpoint(OtlpTraceHost+":"+OtlpHTTPTracePort),
 		otlptracehttp.WithInsecure(),
 		otlptracehttp.WithTimeout(5*time.Second),
 	)
@@ -117,14 +136,29 @@ func newJaegerTraceExporter(ctx context.Context) (trace.SpanExporter, error) {
 	return traceExporter, nil
 }
 
-// This will create an exporter of the stdout. which sends the traces to console as json outputs
-func newStdoutExporter() (trace.SpanExporter, error) {
-	traceExporter, err := stdouttrace.New(
-		stdouttrace.WithPrettyPrint())
+// // This will create an exporter of the stdout. which sends the traces to console as json outputs
+// func newStdoutExporter() (trace.SpanExporter, error) {
+// 	traceExporter, err := stdouttrace.New(
+// 		stdouttrace.WithPrettyPrint())
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return traceExporter, nil
+// }
+
+// create a new prometheus metric exporter
+func newPrometheusMetricExporter(ctx context.Context) (metric.Exporter, error) {
+	metricExporter, err := otlpmetrichttp.New(ctx,
+		otlpmetrichttp.WithEndpoint(OtlpMetriceHost+":"+OtlpHTTPMetricPort), // host and port only should be specified
+		otlpmetrichttp.WithInsecure(),                                       // use http instead of https
+		otlpmetrichttp.WithTimeout(5*time.Second),
+		otlpmetrichttp.WithURLPath(OtlpHTTPMetricAPIPath), // default prometheus url path for OTLP is /api/v1/otlp/v1/metrics, which we should use here
+	)
 	if err != nil {
 		return nil, err
 	}
-	return traceExporter, nil
+
+	return metricExporter, nil
 }
 
 // To be able to create span
@@ -135,7 +169,10 @@ func newTraceProvider(traceExporter trace.SpanExporter) (*trace.TracerProvider, 
 	// define resource attributes. resource attributes are attrs such as pod name, service name, os, arch and...
 	rattr, err := resource.Merge(
 		resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceName(OtlpApplicationName)))
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName(OtlpApplicationName),
+		))
 	if err != nil {
 		return nil, err
 	}
@@ -149,20 +186,27 @@ func newTraceProvider(traceExporter trace.SpanExporter) (*trace.TracerProvider, 
 	return traceProvider, nil
 }
 
-func newMeterProvider() (*metric.MeterProvider, error) {
-	metricExporter, err := stdoutmetric.New()
+// Creates a new metric provider
+func newMeterProvider(metricExporter metric.Exporter) (*metric.MeterProvider, error) {
+	rattr, err := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName(OtlpApplicationName),
+		))
 	if err != nil {
 		return nil, err
 	}
 
+	// reader will read the metrics based on interval and sent it to the exporter
 	meterProvider := metric.NewMeterProvider(
-		metric.WithReader(metric.NewPeriodicReader(metricExporter,
-			// Default is 1m. Set to 3s for demonstrative purposes.
-			metric.WithInterval(3*time.Second))),
+		metric.WithReader(metric.NewPeriodicReader(metricExporter, metric.WithInterval(time.Second))),
+		metric.WithResource(rattr),
 	)
 	return meterProvider, nil
 }
 
+// Creates a new log provider
 func newLoggerProvider() (*log.LoggerProvider, error) {
 	logExporter, err := stdoutlog.New()
 	if err != nil {

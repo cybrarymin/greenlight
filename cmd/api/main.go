@@ -163,7 +163,7 @@ func Api() {
 	}
 
 	promInit(db)
-	otelShutdown, err := setupOTelSDK(ctx)
+	otelShutdown, err := setupOTelSDK(ctx, db)
 	if err != nil {
 		app.log.Error().Err(err)
 	}
@@ -198,7 +198,7 @@ func openDB(ctx context.Context, cfg *config) (*bun.DB, error) {
 	return db, nil
 }
 
-func (app *application) gracefulShutdown(srv *http.Server, shutdownErr chan error, shutdown func(context.Context) error) {
+func (app *application) gracefulShutdown(srv *http.Server, shutdownErr chan error, otelShutdown func(context.Context) error) {
 
 	// Create a channel to redirect signal to it.
 	quit := make(chan os.Signal, 1)
@@ -215,6 +215,11 @@ func (app *application) gracefulShutdown(srv *http.Server, shutdownErr chan erro
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 	err := srv.Shutdown(ctx) // Shutdown here will block unitl it shutdown everything. we use channel to read in the main function
+	if err != nil {
+		shutdownErr <- err
+	}
+
+	err = otelShutdown(ctx)
 	if err != nil {
 		shutdownErr <- err
 	}

@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
 )
@@ -294,30 +295,26 @@ func (app *application) promMetrics(path string, next http.Handler) http.Handler
 	})
 }
 
-// In case you don't want to use default otelhttp.Handler
-
-// func (app *application) otelHandler(path string, next http.Handler) http.HandlerFunc {
-// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		// Otel Tracer will return the global tracer we set during SetupOtelSDK. Then we can consider a name for tracer and start it to create a span
-// 		ctx, span := otel.Tracer("otel.handler.tracer").Start(r.Context(), "otelHandler.span")
-// 		span.SetAttributes(
-// 			attribute.String("request.path", path),
-// 			attribute.String("client.addr", r.RemoteAddr),
-// 		)
-// 		r = r.WithContext(ctx)
-// 		defer span.End()
-
-// 		span.AddEvent("start processing request")
-// 		next.ServeHTTP(w, r)
-// 		span.AddEvent("finished processing request")
-
-// 	})
-// }
-
 func (app *application) otelHandler(next http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// using otelhttp default package to wrap the handler instead of creating a handler ourselves from scratch
 		instrument := otelhttp.NewHandler(next, "otel.instrumented.handler")
-		instrument.ServeHTTP(w, r)
+		otelMetricHTTPTotalRequests.Add(r.Context(), 1,
+			metric.WithAttributes(attribute.String("path", r.URL.Path)),
+			metric.WithAttributes(attribute.String("method", r.Method)),
+		)
+		snoopMetrics := httpsnoop.CaptureMetrics(instrument, w, r)
+
+		// http response time based on status codes
+		otelMetricHttpDuration.Record(r.Context(), snoopMetrics.Duration.Seconds(),
+			metric.WithAttributes(attribute.String("path", r.URL.Path)),
+		)
+
+		// http total responses
+		otelMetricHTTPTotalResponses.Add(r.Context(), 1)
+		// http total responses based on code
+		otelMetricHTTPTotalResponseStatus.Add(r.Context(), 1,
+			metric.WithAttributes(attribute.String("status", strconv.Itoa(snoopMetrics.Code))),
+		)
 	})
 }

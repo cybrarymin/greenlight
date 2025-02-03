@@ -1,0 +1,41 @@
+version: "2.4"
+services:
+  # bring up Jaeger for distributed tracing with OpenTelemetry
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+    - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - 127.0.0.1:16686:16686 # serve frontend
+      - 127.0.0.1:4317:4317 # Otlp gRPC endpoint
+      - 127.0.0.1:4318:4318 # Otlp HTTP endpoint
+  
+  # bring up Prometheus and Grafana for metric monitoring with OpenTelemetry
+  # Prometheus uses the OTLP receiver instead of pull base methods. so the application will push metrics to prometheus
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+      - '--web.enable-otlp-receiver' # for enabling OTLP on prometheus 
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prom_data:/prometheus
+  
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana:/etc/grafana/provisioning/datasources
+
+volumes:
+  prom_data:
