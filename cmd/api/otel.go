@@ -64,8 +64,8 @@ func setupOTelSDK(ctx context.Context, db *bun.DB) (shutdown func(context.Contex
 	otel.SetTextMapPropagator(prop)
 
 	// Setup trace provider.
-	// Setup Jaeger exporter
-	traceExporter, err := newJaegerTraceExporter(ctx)
+	// Setup otel-collector otlphttp exporter
+	traceExporter, err := newTraceExporter(ctx)
 	if err != nil {
 		handleErr(err)
 		return
@@ -81,7 +81,7 @@ func setupOTelSDK(ctx context.Context, db *bun.DB) (shutdown func(context.Contex
 
 	// Setup prometheusOTLP exporter.
 	// Setup metric provider.
-	metricExporter, err := newPrometheusMetricExporter(ctx)
+	metricExporter, err := newMetricExporter(ctx)
 	if err != nil {
 		handleErr(err)
 		return
@@ -122,7 +122,7 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func newJaegerTraceExporter(ctx context.Context) (trace.SpanExporter, error) {
+func newTraceExporter(ctx context.Context) (trace.SpanExporter, error) {
 	// Create an exporter over HTTP for Jaeger endpoint. In latest version, Jaeger supports otlp endpoint
 	traceExporter, err := otlptracehttp.New(ctx,
 		otlptracehttp.WithEndpoint(OtlpTraceHost+":"+OtlpHTTPTracePort),
@@ -136,23 +136,13 @@ func newJaegerTraceExporter(ctx context.Context) (trace.SpanExporter, error) {
 	return traceExporter, nil
 }
 
-// // This will create an exporter of the stdout. which sends the traces to console as json outputs
-// func newStdoutExporter() (trace.SpanExporter, error) {
-// 	traceExporter, err := stdouttrace.New(
-// 		stdouttrace.WithPrettyPrint())
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return traceExporter, nil
-// }
-
-// create a new prometheus metric exporter
-func newPrometheusMetricExporter(ctx context.Context) (metric.Exporter, error) {
+// create a new otel-collector metric exporter
+func newMetricExporter(ctx context.Context) (metric.Exporter, error) {
 	metricExporter, err := otlpmetrichttp.New(ctx,
 		otlpmetrichttp.WithEndpoint(OtlpMetriceHost+":"+OtlpHTTPMetricPort), // host and port only should be specified
 		otlpmetrichttp.WithInsecure(),                                       // use http instead of https
 		otlpmetrichttp.WithTimeout(5*time.Second),
-		otlpmetrichttp.WithURLPath(OtlpHTTPMetricAPIPath), // default prometheus url path for OTLP is /api/v1/otlp/v1/metrics, which we should use here
+		otlpmetrichttp.WithURLPath(OtlpHTTPMetricAPIPath), // default prometheus url path for OTLP is /api/v1/otlp/v1/metrics, which we should use here in case pushing metrics directly to prometheus instead of otel-collector
 	)
 	if err != nil {
 		return nil, err

@@ -22,9 +22,10 @@ var (
 func initializeOtelMetrics(db *bun.DB) error {
 	ctx := context.Background()
 	var err error
+
 	otelMetricHTTPTotalRequests, err = otelMeter.Int64Counter("http_requests",
 		metric.WithDescription("total number of http requests"),
-		metric.WithUnit("{request}"),
+		metric.WithUnit("1"), // we use 1 if we want to represent the count of something. these are standard units predefined. s, ms, us, ns (for durations/latencies), Could also use KiBy, MiBy, etc. for kibibytes, mebibytes, By for bytes, % for percentage
 	)
 	if err != nil {
 		return err
@@ -32,15 +33,15 @@ func initializeOtelMetrics(db *bun.DB) error {
 
 	otelMetricHTTPTotalResponses, err = otelMeter.Int64Counter("http_responses",
 		metric.WithDescription("total number of responses"),
-		metric.WithUnit("{response}"),
+		metric.WithUnit("1"),
 	)
 	if err != nil {
 		return err
 	}
 
-	otelMetricHTTPTotalResponseStatus, err = otelMeter.Int64Counter("http_responses",
+	otelMetricHTTPTotalResponseStatus, err = otelMeter.Int64Counter("http_responses_status",
 		metric.WithDescription("total number of responses based on status codes"),
-		metric.WithUnit("{response}"),
+		metric.WithUnit("1"),
 	)
 	if err != nil {
 		return err
@@ -48,7 +49,7 @@ func initializeOtelMetrics(db *bun.DB) error {
 
 	otelMetricHttpDuration, err = otelMeter.Float64Histogram("http_response_time",
 		metric.WithDescription("http response time"),
-		metric.WithUnit("{time}"),
+		metric.WithUnit("ms"),
 		metric.WithExplicitBucketBoundaries(5, 10, 50, 100, 1000, 2000, 3000), // all numbers represent the miliseconds. So it will provide you infromation about the miliseconds took a response being sent
 	)
 	if err != nil {
@@ -65,7 +66,7 @@ func initializeOtelMetrics(db *bun.DB) error {
 
 	otelMetricDBStatus, err = otelMeter.Int64ObservableGauge("db_connection_status",
 		metric.WithDescription("database connection status"),
-		metric.WithUnit("{count}"),
+		metric.WithUnit("1"),
 		metric.WithInt64Callback(func(ctx context.Context, obs metric.Int64Observer) error {
 			stats := db.Stats()
 			obs.Observe(int64(stats.MaxOpenConnections),

@@ -1,14 +1,41 @@
 version: "2.4"
 services:
+  otel-collector:
+    image: otel/opentelemetry-collector:0.118.0
+    container_name: otel-collector
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+    restart: unless-stopped
+    command: [ "--config=/etc/config.yaml"]
+    volumes:
+      - ./otelCollector/config.yaml:/etc/config.yaml
+    ports:
+      - "1888:1888"   # pprof extension
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # health_check extension
+      - "5317:4317"   # OTLP gRPC receiver
+      - "5318:4318"   # OTLP HTTP receiver
+      - "55679:55679" # zpages extension
+    depends_on:
+      jaeger:
+        condition: service_started
+      prometheus:
+        condition: service_started
+  
+  
   # bring up Jaeger for distributed tracing with OpenTelemetry
   jaeger:
+    container_name: jaeger
     image: jaegertracing/all-in-one:latest
     environment:
     - COLLECTOR_OTLP_ENABLED=true
     ports:
-      - 127.0.0.1:16686:16686 # serve frontend
-      - 127.0.0.1:4317:4317 # Otlp gRPC endpoint
-      - 127.0.0.1:4318:4318 # Otlp HTTP endpoint
+      - 0.0.0.0:16686:16686 # serve frontend
+      - 0.0.0.0:4317:4317 # Otlp gRPC endpoint
+      - 0.0.0.0:4318:4318 # Otlp HTTP endpoint
   
   # bring up Prometheus and Grafana for metric monitoring with OpenTelemetry
   # Prometheus uses the OTLP receiver instead of pull base methods. so the application will push metrics to prometheus

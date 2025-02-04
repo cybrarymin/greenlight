@@ -35,7 +35,7 @@ build/api:
 ## run/api: run the application
 .PHONY: run/api
 run/api:
-	@go run main.go --db-connection-string="${DATABASE_DSN}" --smtp-server-addr="${SMTP_SERVER}" --smtp-username="${SMTP_USERNAME}" --smtp-password="${SMTP_PASSWORD}" --jwt-key="${JWT_KEYSTRING}" --otlp-trace-host="${OTLP_TRACE_HOST}" --otlp-trace-http-port="${OTLP_TRACE_PORT}" --otlp-metric-host=${OTLP_METRIC_HOST} --otlp-metric-http-port=${OTLP_METRIC_PORT} --otlp-metric-api-path="${OTLP_METRIC_PROMETHEUS_API_PATH}"
+	@go run main.go --db-connection-string="${DATABASE_DSN}" --smtp-server-addr="${SMTP_SERVER}" --smtp-username="${SMTP_USERNAME}" --smtp-password="${SMTP_PASSWORD}" --jwt-key="${JWT_KEYSTRING}" --otlp-trace-host="${OTLP_TRACE_HOST}" --otlp-trace-http-port="${OTLP_TRACE_PORT}" --otlp-metric-host=${OTLP_METRIC_HOST} --otlp-metric-http-port=${OTLP_METRIC_PORT}
 
 ## /db/migrations/up: running database migrations to create table and indexes
 .PHONY: db/migrations/up

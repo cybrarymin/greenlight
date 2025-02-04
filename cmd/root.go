@@ -84,7 +84,7 @@ func init() {
 	rootCmd.Flags().StringVar(&api.OtlpHTTPTracePort, "otlp-trace-http-port", "4318", "opentelemetry protocol jaeger port ")
 	rootCmd.Flags().StringVar(&api.OtlpMetriceHost, "otlp-metric-host", "localhost", "opentelemetry protocol for prometheus host ")
 	rootCmd.Flags().StringVar(&api.OtlpHTTPMetricPort, "otlp-metric-http-port", "4318", "opentelemetry protocol prometheus port ")
-	rootCmd.Flags().StringVar(&api.OtlpHTTPMetricAPIPath, "otlp-metric-api-path", "/api/v1/otlp/v1/metrics", "defining the api path for otlp on prometheus")
+	rootCmd.Flags().StringVar(&api.OtlpHTTPMetricAPIPath, "otlp-metric-api-path", "", "defining the api path for otlp on prometheus")
 	rootCmd.Flags().StringVar(&api.OtlpApplicationName, "otlp-appname", "greenlight_app", "name for the application to be represented in the opentelemetry backends")
 
 }
