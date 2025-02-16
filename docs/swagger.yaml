@@ -1,0 +1,447 @@
+basePath: /v1
+definitions:
+  api.SwaggerBadRequestResponse:
+    properties:
+      error:
+        example: bad request error
+        type: string
+    type: object
+  api.SwaggerCreateMovieInput:
+    properties:
+      genres:
+        example:
+        - adventure
+        - action
+        items:
+          type: string
+        type: array
+      runtime:
+        description: or use a custom type
+        example: 75 mins
+        type: string
+      title:
+        example: avengers
+        type: string
+      year:
+        example: 2018
+        type: integer
+    type: object
+  api.SwaggerCreateResponse:
+    properties:
+      result:
+        $ref: '#/definitions/data.Movie'
+    type: object
+  api.SwaggerDeleteResponse:
+    properties:
+      result:
+        example: movie deleted successfully
+        type: string
+    type: object
+  api.SwaggerEditConflictResponse:
+    properties:
+      error:
+        example: unable to update the record due to an edit conflict, please try again
+        type: string
+    type: object
+  api.SwaggerFailedValidationResponse:
+    properties:
+      error:
+        example: unprocessable input error
+        type: string
+    type: object
+  api.SwaggerGetResponse:
+    description: api documentation
+    properties:
+      Movie:
+        $ref: '#/definitions/data.Movie'
+    type: object
+  api.SwaggerListResponse:
+    properties:
+      metadata:
+        $ref: '#/definitions/data.PaginationMeta'
+      movies:
+        items:
+          $ref: '#/definitions/data.Movie'
+        type: array
+    type: object
+  api.SwaggerNotFound:
+    properties:
+      error:
+        example: the requested resource couldn't be found
+        type: string
+    type: object
+  api.SwaggerNotPermitted:
+    properties:
+      error:
+        example: permission denied
+        type: string
+    type: object
+  api.SwaggerRateLimitExceedResponse:
+    properties:
+      error:
+        example: request rate limit reached, please try again later
+        type: string
+    type: object
+  api.SwaggerServerErrorResponse:
+    properties:
+      error:
+        example: the server encountered an error to process the request
+        type: string
+    type: object
+  api.SwaggerUnauthorizaed:
+    properties:
+      error:
+        example: unauthorized request
+        type: string
+    type: object
+  data.Movie:
+    properties:
+      genres:
+        description: |-
+          Genres is a list of categories.
+          Required: true
+        example:
+        - adventure
+        - action
+        items:
+          type: string
+        type: array
+      id:
+        description: |-
+          ID is auto-generated, not required for creation.
+          We won't mark it as required here.
+        example: 1
+        type: integer
+      runtime:
+        description: |-
+          Runtime in minutes.
+          Required: true
+        example: 75 mins
+        type: string
+      title:
+        description: |-
+          Title is the movie title.
+          Required: true
+        example: avengers
+        type: string
+      version:
+        description: Version number will be increased each time the movies is updated
+        example: 1
+        type: integer
+      year:
+        description: |-
+          Year is the production year.
+          Required: true
+        example: 2018
+        type: integer
+    type: object
+  data.PaginationMeta:
+    properties:
+      current_page:
+        example: 1
+        type: integer
+      first_page:
+        example: 1
+        type: integer
+      last_page:
+        example: 3
+        type: integer
+      page_size:
+        example: 10
+        type: integer
+      total_records:
+        example: 30
+        type: integer
+    type: object
+host: 127.0.0.1:8080
+info:
+  contact:
+    email: aminmoghaddam1377@gmail.com
+    name: Ryan
+    url: https://github.com/cybrarymin
+  description: api documentation
+  title: Documentation of greenlight app api
+  version: "1"
+paths:
+  /movies:
+    get:
+      consumes:
+      - application/json
+      description: list all movies.
+      parameters:
+      - description: jwt token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: movie title
+        in: query
+        name: title
+        type: string
+      - collectionFormat: csv
+        description: movie genres
+        in: query
+        items:
+          type: string
+        name: genres
+        type: array
+      - default: 1
+        description: page number
+        in: query
+        name: page
+        type: integer
+      - default: 100
+        description: number of elements on each page
+        in: query
+        name: page_size
+        type: integer
+      - default: id
+        description: 'sort options: id, title, year, runtime, -id, -title, -year,
+          -runtim'
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: successfull response
+          schema:
+            $ref: '#/definitions/api.SwaggerListResponse'
+        "401":
+          description: 'invalid, expired or wrong token '
+          schema:
+            $ref: '#/definitions/api.SwaggerUnauthorizaed'
+        "403":
+          description: permission denied
+          schema:
+            $ref: '#/definitions/api.SwaggerNotPermitted'
+        "404":
+          description: no movie found
+          schema:
+            $ref: '#/definitions/api.SwaggerNotFound'
+        "422":
+          description: invalid input provided
+          schema:
+            $ref: '#/definitions/api.SwaggerFailedValidationResponse'
+        "429":
+          description: request rate limit reached
+          schema:
+            $ref: '#/definitions/api.SwaggerRateLimitExceedResponse'
+        "500":
+          description: server couldn't process the request
+          schema:
+            $ref: '#/definitions/api.SwaggerServerErrorResponse'
+      summary: list movies
+      tags:
+      - movie
+      - list
+    post:
+      consumes:
+      - application/json
+      description: create a movie
+      parameters:
+      - description: movie data as body
+        in: body
+        name: movie
+        required: true
+        schema:
+          $ref: '#/definitions/api.SwaggerCreateMovieInput'
+      - description: jwt token
+        in: header
+        name: authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: successful response
+          schema:
+            $ref: '#/definitions/api.SwaggerCreateResponse'
+        "400":
+          description: bad requet and malformed input
+          schema:
+            $ref: '#/definitions/api.SwaggerBadRequestResponse'
+        "401":
+          description: 'invalid, expired or wrong token '
+          schema:
+            $ref: '#/definitions/api.SwaggerUnauthorizaed'
+        "403":
+          description: permission denied
+          schema:
+            $ref: '#/definitions/api.SwaggerNotPermitted'
+        "404":
+          description: no movie found
+          schema:
+            $ref: '#/definitions/api.SwaggerNotFound'
+        "422":
+          description: invalid input provided
+          schema:
+            $ref: '#/definitions/api.SwaggerFailedValidationResponse'
+        "429":
+          description: request rate limit reached
+          schema:
+            $ref: '#/definitions/api.SwaggerRateLimitExceedResponse'
+        "500":
+          description: server couldn't process the request
+          schema:
+            $ref: '#/definitions/api.SwaggerServerErrorResponse'
+      summary: create a movie
+      tags:
+      - movie
+      - create
+  /movies/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete movie
+      parameters:
+      - description: jwt token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: movie id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: successfull response
+          schema:
+            $ref: '#/definitions/api.SwaggerDeleteResponse'
+        "401":
+          description: 'invalid, expired or wrong token '
+          schema:
+            $ref: '#/definitions/api.SwaggerUnauthorizaed'
+        "403":
+          description: permission denied
+          schema:
+            $ref: '#/definitions/api.SwaggerNotPermitted'
+        "404":
+          description: no movie found
+          schema:
+            $ref: '#/definitions/api.SwaggerNotFound'
+        "429":
+          description: request rate limit reached
+          schema:
+            $ref: '#/definitions/api.SwaggerRateLimitExceedResponse'
+        "500":
+          description: server couldn't process the request
+          schema:
+            $ref: '#/definitions/api.SwaggerServerErrorResponse'
+      summary: delete movie
+      tags:
+      - movie
+      - delete
+    get:
+      consumes:
+      - application/json
+      description: Get movie detail.
+      parameters:
+      - description: jwt token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: movie id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: successfull response
+          schema:
+            $ref: '#/definitions/api.SwaggerGetResponse'
+        "401":
+          description: 'invalid, expired or wrong token '
+          schema:
+            $ref: '#/definitions/api.SwaggerUnauthorizaed'
+        "403":
+          description: permission denied
+          schema:
+            $ref: '#/definitions/api.SwaggerNotPermitted'
+        "404":
+          description: no movie found
+          schema:
+            $ref: '#/definitions/api.SwaggerNotFound'
+        "429":
+          description: request rate limit reached
+          schema:
+            $ref: '#/definitions/api.SwaggerRateLimitExceedResponse'
+        "500":
+          description: server couldn't process the request
+          schema:
+            $ref: '#/definitions/api.SwaggerServerErrorResponse'
+      summary: Get movie detail
+      tags:
+      - movie
+      - get
+    patch:
+      consumes:
+      - application/json
+      description: update movie
+      parameters:
+      - description: jwt token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: movie id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: movie data as body
+        in: body
+        name: movie
+        required: true
+        schema:
+          $ref: '#/definitions/api.SwaggerCreateMovieInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: successfull response
+          schema:
+            $ref: '#/definitions/api.SwaggerCreateResponse'
+        "400":
+          description: bad requet and malformed input
+          schema:
+            $ref: '#/definitions/api.SwaggerBadRequestResponse'
+        "401":
+          description: 'invalid, expired or wrong token '
+          schema:
+            $ref: '#/definitions/api.SwaggerUnauthorizaed'
+        "403":
+          description: permission denied
+          schema:
+            $ref: '#/definitions/api.SwaggerNotPermitted'
+        "404":
+          description: no movie found
+          schema:
+            $ref: '#/definitions/api.SwaggerNotFound'
+        "409":
+          description: conflict during concurrent update
+          schema:
+            $ref: '#/definitions/api.SwaggerEditConflictResponse'
+        "429":
+          description: request rate limit reached
+          schema:
+            $ref: '#/definitions/api.SwaggerRateLimitExceedResponse'
+        "500":
+          description: server couldn't process the request
+          schema:
+            $ref: '#/definitions/api.SwaggerServerErrorResponse'
+      summary: update movie
+      tags:
+      - movie
+      - update
+swagger: "2.0"

@@ -13,6 +13,24 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// CreateMovie godoc
+//
+//	@Summary		create a movie
+//	@Description	create a movie
+//	@Tags			movie,create
+//	@Accept			json
+//	@Produce		json
+//	@Param			movie			body		SwaggerCreateMovieInput			true	"movie data as body"
+//	@Param			authorization	header		string							true	"jwt token"
+//	@Success		201				{object}	SwaggerCreateResponse			"successful response"
+//	@Failure		400				{object}	SwaggerBadRequestResponse		"bad requet and malformed input"
+//	@Failure		401				{object}	SwaggerUnauthorizaed			"invalid, expired or wrong token "
+//	@Failure		403				{object}	SwaggerNotPermitted				"permission denied"
+//	@Failure		404				{object}	SwaggerNotFound					"no movie found"
+//	@Failure		422				{object}	SwaggerFailedValidationResponse	"invalid input provided"
+//	@Failure		429				{object}	SwaggerRateLimitExceedResponse	"request rate limit reached"
+//	@Failure		500				{object}	SwaggerServerErrorResponse		"server couldn't process the request"
+//	@Router			/movies [post]
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, span := otel.Tracer("createMovie.handler.tracer").Start(r.Context(), "createMovie.handler.span")
 	defer span.End()
@@ -66,6 +84,27 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 
 }
 
+// ListMovie godoc
+//
+//	@Summary		list movies
+//	@Description	list all movies.
+//	@Tags			movie,list
+//	@Accept			json
+//	@Produce		json
+//	@Param			Authorization	header		string							true	"jwt token"
+//	@Param			title			query		string							false	"movie title"
+//	@Param			genres			query		[]string						false	"movie genres"
+//	@Param			page			query		int								false	"page number"															default(1)
+//	@Param			page_size		query		int								false	"number of elements on each page"										default(100)
+//	@Param			sort			query		string							false	"sort options: id, title, year, runtime, -id, -title, -year, -runtim"	default(id)
+//	@Success		200				{object}	SwaggerListResponse				"successfull response"
+//	@Failure		401				{object}	SwaggerUnauthorizaed			"invalid, expired or wrong token "
+//	@Failure		403				{object}	SwaggerNotPermitted				"permission denied"
+//	@Failure		404				{object}	SwaggerNotFound					"no movie found"
+//	@Failure		422				{object}	SwaggerFailedValidationResponse	"invalid input provided"
+//	@Failure		429				{object}	SwaggerRateLimitExceedResponse	"request rate limit reached"
+//	@Failure		500				{object}	SwaggerServerErrorResponse		"server couldn't process the request"
+//	@Router			/movies [get]
 func (app *application) listMovieHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, span := otel.Tracer("listMovie.handler.tracer").Start(r.Context(), "listMovie.handler.span")
 	defer span.End()
@@ -95,9 +134,9 @@ func (app *application) listMovieHandler(w http.ResponseWriter, r *http.Request)
 
 	span.AddEvent("querying database to get list of movies")
 	movies, count, err := app.models.Movies.List(ctx, input.Title, input.Genres, &input.Filters)
-	if err != nil {
+	if err != nil || count == 0 {
 		switch {
-		case errors.Is(err, data.ErrorRecordNotFound):
+		case errors.Is(err, data.ErrorRecordNotFound) || count == 0:
 			span.RecordError(err)
 			span.SetStatus(codes.Ok, otelDBNotFoundInfo)
 			app.notFoundResponse(w, r)
@@ -117,6 +156,23 @@ func (app *application) listMovieHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 }
+
+// ShowMovie godoc
+//
+//	@Summary		Get movie detail
+//	@Description	Get movie detail.
+//	@Tags			movie,get
+//	@Accept			json
+//	@Produce		json
+//	@Param			Authorization	header		string							true	"jwt token"
+//	@Param			id				path		string							true	"movie id"
+//	@Success		200				{object}	SwaggerGetResponse				"successfull response"
+//	@Failure		401				{object}	SwaggerUnauthorizaed			"invalid, expired or wrong token "
+//	@Failure		403				{object}	SwaggerNotPermitted				"permission denied"
+//	@Failure		404				{object}	SwaggerNotFound					"no movie found"
+//	@Failure		429				{object}	SwaggerRateLimitExceedResponse	"request rate limit reached"
+//	@Failure		500				{object}	SwaggerServerErrorResponse		"server couldn't process the request"
+//	@Router			/movies/{id} [get]
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, span := otel.Tracer("showMovie.handler.tracer").Start(r.Context(), "showMovie.handler.span")
 	defer span.End()
@@ -150,6 +206,22 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 
 }
 
+// DeleteMovie godoc
+//
+//	@Summary		delete movie
+//	@Description	delete movie
+//	@Tags			movie,delete
+//	@Accept			json
+//	@Produce		json
+//	@Param			Authorization	header		string							true	"jwt token"
+//	@Param			id				path		string							true	"movie id"
+//	@Success		200				{object}	SwaggerDeleteResponse			"successfull response"
+//	@Failure		401				{object}	SwaggerUnauthorizaed			"invalid, expired or wrong token "
+//	@Failure		403				{object}	SwaggerNotPermitted				"permission denied"
+//	@Failure		404				{object}	SwaggerNotFound					"no movie found"
+//	@Failure		429				{object}	SwaggerRateLimitExceedResponse	"request rate limit reached"
+//	@Failure		500				{object}	SwaggerServerErrorResponse		"server couldn't process the request"
+//	@Router			/movies/{id} [delete]
 func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, span := otel.Tracer("showMovie.handler.tracer").Start(r.Context(), "showMovie.handler.span")
 	defer span.End()
@@ -182,6 +254,25 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 
 }
 
+// UpdateMovie godoc
+//
+//	@Summary		update movie
+//	@Description	update movie
+//	@Tags			movie,update
+//	@Accept			json
+//	@Produce		json
+//	@Param			Authorization	header		string							true	"jwt token"
+//	@Param			id				path		string							true	"movie id"
+//	@Param			movie			body		SwaggerCreateMovieInput			true	"movie data as body"
+//	@Success		200				{object}	SwaggerCreateResponse			"successfull response"
+//	@Failure		400				{object}	SwaggerBadRequestResponse		"bad requet and malformed input"
+//	@Failure		401				{object}	SwaggerUnauthorizaed			"invalid, expired or wrong token "
+//	@Failure		403				{object}	SwaggerNotPermitted				"permission denied"
+//	@Failure		404				{object}	SwaggerNotFound					"no movie found"
+//	@Failure		409				{object}	SwaggerEditConflictResponse		"conflict during concurrent update"
+//	@Failure		429				{object}	SwaggerRateLimitExceedResponse	"request rate limit reached"
+//	@Failure		500				{object}	SwaggerServerErrorResponse		"server couldn't process the request"
+//	@Router			/movies/{id} [patch]
 func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, span := otel.Tracer("showMovie.handler.tracer").Start(r.Context(), "showMovie.handler.span")
 	defer span.End()

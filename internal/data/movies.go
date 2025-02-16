@@ -19,15 +19,27 @@ var (
 	ErrEditConflict         = errors.New("edit conflict")
 )
 
+// movie swagger
 type Movie struct {
-	bun.BaseModel `bun:"table:movies"`
-	ID            int64     `json:"id" bun:",pk,autoincrement,notnull,type:bigserial"`                                              // ID is the identifier of the movie
-	CreatedAt     time.Time `json:"-" bun:"created_at,notnull,nullzero,default:current_timestamp,type:timestamp(0) with time zone"` // timestamp when movies is added to the database
-	Title         string    `json:"title" bun:",notnull"`                                                                           // Movie title
-	Year          int32     `json:"year,omitempty" bun:",notnull"`                                                                  // Year movie created
-	Runtime       Runtime   `json:"runtime,omitempty" bun:",notnull"`                                                               // Movie runtime in minutes
-	Genres        []string  `json:"genres,omitempty" bun:"genres,array,notnull"`                                                    // Genres of the movie
-	Version       int32     `json:"version" bun:",notnull,default:1"`                                                               // Version number will be increased each time the movies is updated
+	bun.BaseModel `bun:"table:movies" swaggerignore:"true"`
+	// ID is auto-generated, not required for creation.
+	// We won't mark it as required here.
+	ID        int64     `json:"id" bun:",pk,autoincrement,notnull,type:bigserial" example:"1"`                                  // ID is the identifier of the movie
+	CreatedAt time.Time `json:"-" bun:"created_at,notnull,nullzero,default:current_timestamp,type:timestamp(0) with time zone"` // timestamp when movies is added to the database
+	// Title is the movie title.
+	// Required: true
+	Title string `json:"title" bun:",notnull" example:"avengers"`
+	// Year is the production year.
+	// Required: true
+	Year int32 `json:"year,omitempty" bun:",notnull" example:"2018"`
+	// Runtime in minutes.
+	// Required: true
+	Runtime Runtime `json:"runtime,omitempty" bun:",notnull" swaggertype:"string" example:"75 mins"`
+	// Genres is a list of categories.
+	// Required: true
+	Genres []string `json:"genres,omitempty" bun:"genres,array,notnull" example:"adventure,action"`
+	// Version number will be increased each time the movies is updated
+	Version int32 `json:"version" bun:",notnull,default:1" example:"1"`
 }
 
 type MovieModel struct {
@@ -111,7 +123,7 @@ func (m *MovieModel) List(ctx context.Context, title string, genres []string, fi
 
 	orderQuery := filters.SortColumn() + " " + filters.SortDirection()
 	err := m.db.NewSelect().Model((*Movie)(nil)).ColumnExpr("COUNT(*) OVER(),*").Where("(title_tsvector @@ to_tsquery('simple',?)) OR (? = '')", title, title).Where("(genres @> ? OR ? = '{}')", pgdialect.Array(genres), pgdialect.Array(genres)).OrderExpr(orderQuery).Limit(filters.limit()).Offset(filters.offset()).Scan(timeoutCtx, &args)
-	if err != nil {
+	if err != nil || len(args) == 0 {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			return nil, 0, ErrorRecordNotFound

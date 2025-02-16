@@ -9,7 +9,7 @@ alerting:
     scheme: http
     timeout: 10s
     api_version: v2
-otlp:
+otlp: # in case you want to send traffic directly in push base method to prometheus OTLP receiver
   promote_resource_attributes:
     - service.instance.id
     - service.name

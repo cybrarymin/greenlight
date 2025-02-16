@@ -5,6 +5,8 @@ import (
 	"net/http"
 )
 
+type Envelope map[string]interface{}
+
 // logError is the method we use to log the errors happens on the server side for the application.
 func (app *application) logError(err error) {
 	app.log.Error().Err(err).Send()
@@ -62,7 +64,7 @@ func (app *application) rateLimitExceedResponse(w http.ResponseWriter, r *http.R
 
 func (app *application) invalidActivationTokenResponse(w http.ResponseWriter, r *http.Request) {
 	message := "invalid or expired activation token"
-	app.errorResponse(w, r, http.StatusTooManyRequests, message)
+	app.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 
 func (app *application) invalidAuthenticationCredResponse(w http.ResponseWriter, r *http.Request) {

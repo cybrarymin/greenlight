@@ -74,3 +74,12 @@ vendor:
 	go mod tidy
 	@echo "Vendoring all golang dependency modules and packages..."
 	go mod vendor
+
+
+#================================================================#
+# Swagger documentation
+#================================================================#
+.PHONY: docs/swagger
+docs/swagger:
+	@swag fmt
+	@swag init -g cmd/api/swagger.go

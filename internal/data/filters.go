@@ -17,11 +17,11 @@ type Filters struct {
 }
 
 type PaginationMeta struct {
-	FirstPage    int `json:"first_page,omitempty"`
-	LastPage     int `json:"last_page,omitempty"`
-	TotalRecords int `json:"total_records,omitempty"`
-	PageSize     int `json:"page_size,omitempty"`
-	CurrentPage  int `json:"current_page,omitempty"`
+	FirstPage    int `json:"first_page,omitempty" example:"1"`
+	LastPage     int `json:"last_page,omitempty" example:"3"`
+	TotalRecords int `json:"total_records,omitempty" example:"30"`
+	PageSize     int `json:"page_size,omitempty" example:"10"`
+	CurrentPage  int `json:"current_page,omitempty" example:"1"`
 }
 
 func (f *Filters) ValidateFilters(v *Validator) {

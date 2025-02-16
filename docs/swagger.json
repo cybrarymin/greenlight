@@ -1,0 +1,640 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "api documentation",
+        "title": "Documentation of greenlight app api",
+        "contact": {
+            "name": "Ryan",
+            "url": "https://github.com/cybrarymin",
+            "email": "aminmoghaddam1377@gmail.com"
+        },
+        "version": "1"
+    },
+    "host": "127.0.0.1:8080",
+    "basePath": "/v1",
+    "paths": {
+        "/movies": {
+            "get": {
+                "description": "list all movies.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "movie",
+                    "list"
+                ],
+                "summary": "list movies",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "jwt token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "movie title",
+                        "name": "title",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "movie genres",
+                        "name": "genres",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "number of elements on each page",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "id",
+                        "description": "sort options: id, title, year, runtime, -id, -title, -year, -runtim",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "successfull response",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid, expired or wrong token ",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerUnauthorizaed"
+                        }
+                    },
+                    "403": {
+                        "description": "permission denied",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerNotPermitted"
+                        }
+                    },
+                    "404": {
+                        "description": "no movie found",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerNotFound"
+                        }
+                    },
+                    "422": {
+                        "description": "invalid input provided",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerFailedValidationResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "request rate limit reached",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerRateLimitExceedResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "server couldn't process the request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerServerErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "create a movie",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "movie",
+                    "create"
+                ],
+                "summary": "create a movie",
+                "parameters": [
+                    {
+                        "description": "movie data as body",
+                        "name": "movie",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerCreateMovieInput"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "jwt token",
+                        "name": "authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "successful response",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerCreateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "bad requet and malformed input",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerBadRequestResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid, expired or wrong token ",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerUnauthorizaed"
+                        }
+                    },
+                    "403": {
+                        "description": "permission denied",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerNotPermitted"
+                        }
+                    },
+                    "404": {
+                        "description": "no movie found",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerNotFound"
+                        }
+                    },
+                    "422": {
+                        "description": "invalid input provided",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerFailedValidationResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "request rate limit reached",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerRateLimitExceedResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "server couldn't process the request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerServerErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/movies/{id}": {
+            "get": {
+                "description": "Get movie detail.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "movie",
+                    "get"
+                ],
+                "summary": "Get movie detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "jwt token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "movie id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "successfull response",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerGetResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid, expired or wrong token ",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerUnauthorizaed"
+                        }
+                    },
+                    "403": {
+                        "description": "permission denied",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerNotPermitted"
+                        }
+                    },
+                    "404": {
+                        "description": "no movie found",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerNotFound"
+                        }
+                    },
+                    "429": {
+                        "description": "request rate limit reached",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerRateLimitExceedResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "server couldn't process the request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerServerErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "delete movie",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "movie",
+                    "delete"
+                ],
+                "summary": "delete movie",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "jwt token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "movie id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "successfull response",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerDeleteResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid, expired or wrong token ",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerUnauthorizaed"
+                        }
+                    },
+                    "403": {
+                        "description": "permission denied",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerNotPermitted"
+                        }
+                    },
+                    "404": {
+                        "description": "no movie found",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerNotFound"
+                        }
+                    },
+                    "429": {
+                        "description": "request rate limit reached",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerRateLimitExceedResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "server couldn't process the request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerServerErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "update movie",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "movie",
+                    "update"
+                ],
+                "summary": "update movie",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "jwt token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "movie id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "movie data as body",
+                        "name": "movie",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerCreateMovieInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "successfull response",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerCreateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "bad requet and malformed input",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerBadRequestResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid, expired or wrong token ",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerUnauthorizaed"
+                        }
+                    },
+                    "403": {
+                        "description": "permission denied",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerNotPermitted"
+                        }
+                    },
+                    "404": {
+                        "description": "no movie found",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerNotFound"
+                        }
+                    },
+                    "409": {
+                        "description": "conflict during concurrent update",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerEditConflictResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "request rate limit reached",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerRateLimitExceedResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "server couldn't process the request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerServerErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "api.SwaggerBadRequestResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "bad request error"
+                }
+            }
+        },
+        "api.SwaggerCreateMovieInput": {
+            "type": "object",
+            "properties": {
+                "genres": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "adventure",
+                        "action"
+                    ]
+                },
+                "runtime": {
+                    "description": "or use a custom type",
+                    "type": "string",
+                    "example": "75 mins"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "avengers"
+                },
+                "year": {
+                    "type": "integer",
+                    "example": 2018
+                }
+            }
+        },
+        "api.SwaggerCreateResponse": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "$ref": "#/definitions/data.Movie"
+                }
+            }
+        },
+        "api.SwaggerDeleteResponse": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "example": "movie deleted successfully"
+                }
+            }
+        },
+        "api.SwaggerEditConflictResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "unable to update the record due to an edit conflict, please try again"
+                }
+            }
+        },
+        "api.SwaggerFailedValidationResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "unprocessable input error"
+                }
+            }
+        },
+        "api.SwaggerGetResponse": {
+            "description": "api documentation",
+            "type": "object",
+            "properties": {
+                "Movie": {
+                    "$ref": "#/definitions/data.Movie"
+                }
+            }
+        },
+        "api.SwaggerListResponse": {
+            "type": "object",
+            "properties": {
+                "metadata": {
+                    "$ref": "#/definitions/data.PaginationMeta"
+                },
+                "movies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/data.Movie"
+                    }
+                }
+            }
+        },
+        "api.SwaggerNotFound": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "the requested resource couldn't be found"
+                }
+            }
+        },
+        "api.SwaggerNotPermitted": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "permission denied"
+                }
+            }
+        },
+        "api.SwaggerRateLimitExceedResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "request rate limit reached, please try again later"
+                }
+            }
+        },
+        "api.SwaggerServerErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "the server encountered an error to process the request"
+                }
+            }
+        },
+        "api.SwaggerUnauthorizaed": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "unauthorized request"
+                }
+            }
+        },
+        "data.Movie": {
+            "type": "object",
+            "properties": {
+                "genres": {
+                    "description": "Genres is a list of categories.\nRequired: true",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "adventure",
+                        "action"
+                    ]
+                },
+                "id": {
+                    "description": "ID is auto-generated, not required for creation.\nWe won't mark it as required here.",
+                    "type": "integer",
+                    "example": 1
+                },
+                "runtime": {
+                    "description": "Runtime in minutes.\nRequired: true",
+                    "type": "string",
+                    "example": "75 mins"
+                },
+                "title": {
+                    "description": "Title is the movie title.\nRequired: true",
+                    "type": "string",
+                    "example": "avengers"
+                },
+                "version": {
+                    "description": "Version number will be increased each time the movies is updated",
+                    "type": "integer",
+                    "example": 1
+                },
+                "year": {
+                    "description": "Year is the production year.\nRequired: true",
+                    "type": "integer",
+                    "example": 2018
+                }
+            }
+        },
+        "data.PaginationMeta": {
+            "type": "object",
+            "properties": {
+                "current_page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "first_page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "last_page": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "page_size": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "total_records": {
+                    "type": "integer",
+                    "example": 30
+                }
+            }
+        }
+    }
+}
